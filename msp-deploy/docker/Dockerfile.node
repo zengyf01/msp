@@ -1,0 +1,14 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+COPY msp-node/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY msp-node/src /app/src
+
+ENV PYTHONPATH=/app/src
+
+EXPOSE 50051
+
+ENTRYPOINT ["python", "-m", "msp_node.transport.grpc_server"]

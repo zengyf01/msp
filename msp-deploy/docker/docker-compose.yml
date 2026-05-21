@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_DATABASE: msp_db
+      MYSQL_USER: msp
+      MYSQL_PASSWORD: ${DB_PASSWORD:-msp123456}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root123456}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # Kuscia Master (K8s编排)
+  kuscia-master:
+    image: secretflow/kuscia:latest
+    command: ["sh", "-c", "mkdir -p /home/kuscia/data/etc/config && kuscia init --mode master -d kuscia-master -e 'mysql://msp:msp123456@tcp(mysql:3306)/kuscia_db?charset=utf8mb4&parseTime=True&loc=Local' > /home/kuscia/data/etc/config/kuscia.yaml && kuscia start -c /home/kuscia/data/etc/config/kuscia.yaml"]
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    volumes:
+      - kuscia_data:/home/kuscia/data
+    depends_on:
+      - mysql
+    environment:
+      - KUSCIA_API_ADDRESS=0.0.0.0:8083
+
+  # 调度服务
+  scheduler:
+    build:
+      context: ../../msp-backend
+      dockerfile: msp-scheduler/Dockerfile
+    ports:
+      - "18081:8081"
+    depends_on:
+      - mysql
+      - kuscia-master
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=msp
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-msp123456}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+      - KUSCIA_API_ADDRESS=kuscia-master:8083
+
+  # API网关
+  gateway:
+    build:
+      context: ../../msp-backend
+      dockerfile: msp-gateway/Dockerfile
+    ports:
+      - "8090:8090"
+    depends_on:
+      - scheduler
+    environment:
+      - SPRING_CLOUD_GATEWAY_ROUTES_SCHEDULER_URI=http://scheduler:8081
+
+  # 节点管理服务
+  node-manager:
+    build:
+      context: ../../msp-backend
+      dockerfile: msp-node-manager/Dockerfile
+    ports:
+      - "8082:8082"
+    depends_on:
+      - mysql
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=msp
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-msp123456}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+
+  # 前端
+  frontend:
+    build:
+      context: ../../msp-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+
+volumes:
+  mysql_data:
+  kuscia_data:

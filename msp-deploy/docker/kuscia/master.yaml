@@ -1,0 +1,9 @@
+# Kuscia Master 配置
+apiVersion: kuscia.secretflow/v1alpha1
+kind: KusciaMaster
+metadata:
+  name: kuscia-master
+spec:
+  apiVersion: secretflow.secretflow/v1alpha1
+  kind: SPU
+  masterPort: 8081

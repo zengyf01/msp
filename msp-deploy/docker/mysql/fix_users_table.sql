@@ -1,0 +1,4 @@
+-- 修复msp_users表结构，添加缺失的列
+ALTER TABLE msp_users ADD COLUMN IF NOT EXISTS email VARCHAR(128) AFTER password;
+ALTER TABLE msp_users ADD COLUMN IF NOT EXISTS phone VARCHAR(32) AFTER email;
+ALTER TABLE msp_users ADD COLUMN IF NOT EXISTS status VARCHAR(16) DEFAULT 'ACTIVE' AFTER role;

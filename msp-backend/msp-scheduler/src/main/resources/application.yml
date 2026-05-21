@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: msp-scheduler
+  datasource:
+    url: jdbc:mysql://localhost:3306/msp_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: msp
+    password: msp123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+server:
+  port: 8081
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key-here-must-be-at-least-32-chars}
+  expiration: 86400000
+
+# Kuscia配置
+kuscia:
+  api:
+    address: localhost:8083
+    protocol: tls
+    cert-file: config/certs/client.crt
+    key-file: config/certs/client.pem
+    token-file: config/certs/token
+
+# 任务调度配置
+msp:
+  scheduler:
+    max-parallelism: 10
+    task-timeout-minutes: 60
+
+# 监控配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# 日志配置
+logging:
+  level:
+    com.msp: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

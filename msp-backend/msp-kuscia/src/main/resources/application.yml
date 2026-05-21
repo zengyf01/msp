@@ -1,0 +1,19 @@
+# Kuscia连接配置
+kuscia:
+  master:
+    url: ${KUSCIA_MASTER_URL:http://kuscia-master:8083}
+    token: ${KUSCIA_TOKEN:}
+  submit:
+    timeout-seconds: 30
+  status:
+    timeout-seconds: 10
+  polling:
+    enabled: true
+    interval-ms: 10000
+    batch-size: 50
+
+# 日志配置
+logging:
+  level:
+    com.msp.kuscia: DEBUG
+    com.msp.scheduler: INFO

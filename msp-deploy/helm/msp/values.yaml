@@ -1,0 +1,149 @@
+# MSP Helm Chart Values
+
+# 全局配置
+global:
+  imagePullSecrets: []
+  storageClass: ""
+
+# 应用配置
+app:
+  name: msp
+  version: "1.0.0"
+
+# MySQL配置
+mysql:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: mysql
+    tag: "8.2.0"
+  service:
+    type: ClusterIP
+    port: 3306
+  database: msp_db
+  username: msp
+  password: msp123456
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# Gateway配置
+gateway:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: msp-gateway
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8090
+  jwt:
+    secret: your-256-bit-secret-key-here-must-be-at-least-32-chars
+    expiration: 86400000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+# Scheduler配置
+scheduler:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: msp-scheduler
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8081
+  jwt:
+    secret: your-256-bit-secret-key-here-must-be-at-least-32-chars
+    expiration: 86400000
+  datasource:
+    url: jdbc:mysql://msp-mysql:3306/msp_db
+    username: msp
+    password: msp123456
+  kuscia:
+    api:
+      address: kuscia-master:8083
+      protocol: tls
+  polling:
+    enabled: true
+    intervalMs: 10000
+    batchSize: 50
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+# Node Manager配置
+nodeManager:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: msp-node-manager
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8082
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# Frontend配置
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: msp-frontend
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+  ingress:
+    enabled: true
+    className: nginx
+    host: msp.example.com
+    path: /
+    tls:
+      enabled: true
+      secretName: msp-tls

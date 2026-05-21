@@ -1,0 +1,30 @@
+FROM eclipse-temurin:17-jdk-alpine AS builder
+
+WORKDIR /app
+
+COPY msp-backend/pom.xml .
+COPY msp-backend/msp-common/pom.xml msp-common/
+COPY msp-backend/msp-scheduler/pom.xml msp-scheduler/
+COPY msp-backend/msp-node-manager/pom.xml msp-node-manager/
+COPY msp-backend/msp-kuscia/pom.xml msp-kuscia/
+COPY msp-backend/msp-gateway/pom.xml msp-gateway/
+
+# 复制源代码
+COPY msp-common/src msp-common/src
+COPY msp-scheduler/src msp-scheduler/src
+COPY msp-node-manager/src msp-node-manager/src
+COPY msp-kuscia/src msp-kuscia/src
+COPY msp-gateway/src msp-gateway/src
+
+# 构建
+RUN mvn clean package -DskipTests
+
+FROM eclipse-temurin:17-jre-alpine
+
+WORKDIR /app
+
+COPY --from=builder /app/msp-gateway/target/*.jar app.jar
+
+EXPOSE 8090
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

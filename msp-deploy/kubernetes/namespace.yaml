@@ -1,0 +1,8 @@
+---
+# MSP Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: msp-system
+  labels:
+    app: msp

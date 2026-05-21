@@ -1,0 +1,39 @@
+// MSP Node gRPC Protocol
+syntax = "proto3";
+
+package msp_node;
+
+// 执行任务请求
+message ExecuteTaskRequest {
+    string task_id = 1;
+    string task_type = 2;  // psi, fl, mpc
+    map<string, string> inputs = 3;
+    map<string, string> parameters = 4;
+}
+
+// 执行任务响应
+message ExecuteTaskResponse {
+    bool success = 1;
+    string task_id = 2;
+    string status = 3;
+    string result = 4;
+    string error = 5;
+}
+
+// 健康检查请求
+message HealthCheckRequest {
+}
+
+// 健康检查响应
+message HealthCheckResponse {
+    bool healthy = 1;
+    string version = 2;
+}
+
+// MSP节点服务
+service MSPNode {
+    // 执行任务
+    rpc ExecuteTask(ExecuteTaskRequest) returns (ExecuteTaskResponse);
+    // 健康检查
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
