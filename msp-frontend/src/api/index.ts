@@ -219,4 +219,34 @@ export const permissionAPI = {
     api.delete<{ data: boolean }>(`/permissions/${permissionId}`)
 }
 
+// 系统配置相关API
+export const systemConfigAPI = {
+  getPlatformConfig: () =>
+    api.get<{ data: any }>('/system-config/platform'),
+
+  updatePlatformConfig: (data: any) =>
+    api.put<{ data: boolean }>('/system-config/platform', data),
+
+  getSecurityConfig: () =>
+    api.get<{ data: any }>('/system-config/security'),
+
+  updateSecurityConfig: (data: any) =>
+    api.put<{ data: boolean }>('/system-config/security', data),
+
+  getComputingConfig: () =>
+    api.get<{ data: any }>('/system-config/computing'),
+
+  updateComputingConfig: (data: any) =>
+    api.put<{ data: boolean }>('/system-config/computing', data),
+
+  getNotificationConfig: () =>
+    api.get<{ data: any }>('/system-config/notification'),
+
+  updateNotificationConfig: (data: any) =>
+    api.put<{ data: boolean }>('/system-config/notification', data),
+
+  getAllConfigs: () =>
+    api.get<{ data: any }>('/system-config')
+}
+
 export default api
