@@ -87,7 +87,16 @@ const form = reactive<TaskRequest>({
 
 const parametersJson = ref('')
 
-const availableNodes = computed(() => nodeStore.nodes)
+const availableNodes = computed(() => {
+  // 合并真实节点和模拟节点
+  const realNodes = nodeStore.nodes.filter(n => n.status === 'ONLINE').map(n => ({ ...n, isSimulated: false }))
+  const simulatedNodes = [
+    { nodeId: 'node-a', nodeName: '数据中心A', status: 'ONLINE' as const, isSimulated: true },
+    { nodeId: 'node-b', nodeName: '数据中心B', status: 'ONLINE' as const, isSimulated: true },
+    { nodeId: 'node-c', nodeName: '数据中心C', status: 'ONLINE' as const, isSimulated: true }
+  ]
+  return [...simulatedNodes, ...realNodes]
+})
 
 const rules = {
   name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
@@ -116,7 +125,7 @@ const submitForm = async () => {
     }
 
     const result = await taskStore.createTask(form)
-    ElMessage.success(`任务创建成功: ${result.taskId}`)
+    ElMessage.success('任务创建成功')
     router.push('/tasks')
   } catch (error: any) {
     ElMessage.error(error.message || '创建失败')

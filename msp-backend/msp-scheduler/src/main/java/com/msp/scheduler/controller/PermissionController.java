@@ -36,7 +36,7 @@ public class PermissionController {
     }
 
     @PutMapping("/{permissionId}")
-    public ApiResponse<Boolean> update(@PathVariable String permissionId, @RequestBody PermissionRequest request) {
+    public ApiResponse<Boolean> update(@PathVariable(name = "permissionId") String permissionId, @RequestBody PermissionRequest request) {
         Permission permission = new Permission();
         permission.setPermissionId(permissionId);
         permission.setPermissionName(request.getPermissionName());
@@ -51,7 +51,7 @@ public class PermissionController {
     }
 
     @GetMapping("/{permissionId}")
-    public ApiResponse<Permission> getById(@PathVariable String permissionId) {
+    public ApiResponse<Permission> getById(@PathVariable(name = "permissionId") String permissionId) {
         return permissionService.getById(permissionId)
             .map(ApiResponse::success)
             .orElse(ApiResponse.error("PERMISSION_NOT_FOUND", "权限不存在"));
@@ -76,7 +76,7 @@ public class PermissionController {
     }
 
     @DeleteMapping("/{permissionId}")
-    public ApiResponse<Boolean> delete(@PathVariable String permissionId) {
+    public ApiResponse<Boolean> delete(@PathVariable(name = "permissionId") String permissionId) {
         permissionService.delete(permissionId);
         return ApiResponse.success(true);
     }

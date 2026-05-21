@@ -57,7 +57,7 @@ public class DataSourceController {
      * 查询数据源详情
      */
     @GetMapping("/{datasourceId}")
-    public ApiResponse<DataSource> getDataSource(@PathVariable String datasourceId) {
+    public ApiResponse<DataSource> getDataSource(@PathVariable(name = "datasourceId") String datasourceId) {
         DataSource ds = dataSourceService.getDataSource(datasourceId);
         return ApiResponse.success(ds);
     }
@@ -66,7 +66,7 @@ public class DataSourceController {
      * 更新数据源
      */
     @PutMapping("/{datasourceId}")
-    public ApiResponse<Boolean> updateDataSource(@PathVariable String datasourceId, @RequestBody DataSourceRequest request) {
+    public ApiResponse<Boolean> updateDataSource(@PathVariable(name = "datasourceId") String datasourceId, @RequestBody DataSourceRequest request) {
         DataSource ds = new DataSource();
         ds.setDataSourceId(datasourceId);
         ds.setNodeId(request.getNodeId());
@@ -86,7 +86,7 @@ public class DataSourceController {
      * 删除数据源
      */
     @DeleteMapping("/{datasourceId}")
-    public ApiResponse<Boolean> deleteDataSource(@PathVariable String datasourceId) {
+    public ApiResponse<Boolean> deleteDataSource(@PathVariable(name = "datasourceId") String datasourceId) {
         dataSourceService.deleteDataSource(datasourceId);
         return ApiResponse.success(true);
     }
@@ -110,9 +110,44 @@ public class DataSourceController {
      * 查询节点下的数据源
      */
     @GetMapping("/by-node/{nodeId}")
-    public ApiResponse<List<DataSource>> getDataSourcesByNode(@PathVariable String nodeId) {
+    public ApiResponse<List<DataSource>> getDataSourcesByNode(@PathVariable(name = "nodeId") String nodeId) {
         List<DataSource> result = dataSourceService.getDataSourcesByNodeId(nodeId);
         return ApiResponse.success(result);
+    }
+
+    /**
+     * 创建模拟节点（演示用）
+     */
+    @PostMapping("/simulate")
+    public ApiResponse<Boolean> createSimulatedNode(@RequestBody SimulateNodeRequest request) {
+        boolean success = dataSourceService.createSimulatedNode(
+            request.getNodeId(),
+            request.getDbName(),
+            request.getTableName(),
+            request.getColumnName()
+        );
+        return ApiResponse.success(success);
+    }
+
+    /**
+     * 删除模拟节点（演示用）
+     */
+    @DeleteMapping("/simulate/{nodeId}")
+    public ApiResponse<Boolean> deleteSimulatedNode(@PathVariable(name = "nodeId") String nodeId) {
+        boolean success = dataSourceService.deleteSimulatedNode(nodeId);
+        return ApiResponse.success(success);
+    }
+
+    /**
+     * 获取模拟节点示例数据
+     */
+    @PostMapping("/simulate/sample-data")
+    public ApiResponse<List<List<Object>>> getSimulatedNodeSampleData(@RequestBody SampleDataRequest request) {
+        List<List<Object>> data = dataSourceService.getSimulatedNodeSampleData(
+            request.getDbName(),
+            request.getTableName()
+        );
+        return ApiResponse.success(data);
     }
 
     // 内部类
@@ -144,6 +179,22 @@ public class DataSourceController {
         public void setColumns(List<String> columns) { this.columns = columns; }
     }
 
+    public static class SimulateNodeRequest {
+        private String nodeId;
+        private String dbName;
+        private String tableName;
+        private String columnName;
+
+        public String getNodeId() { return nodeId; }
+        public void setNodeId(String nodeId) { this.nodeId = nodeId; }
+        public String getDbName() { return dbName; }
+        public void setDbName(String dbName) { this.dbName = dbName; }
+        public String getTableName() { return tableName; }
+        public void setTableName(String tableName) { this.tableName = tableName; }
+        public String getColumnName() { return columnName; }
+        public void setColumnName(String columnName) { this.columnName = columnName; }
+    }
+
     public static class DataSourceCreateResponse {
         private String datasourceId;
 
@@ -165,5 +216,15 @@ public class DataSourceController {
 
         public boolean isSuccess() { return success; }
         public String getMessage() { return message; }
+    }
+
+    public static class SampleDataRequest {
+        private String dbName;
+        private String tableName;
+
+        public String getDbName() { return dbName; }
+        public void setDbName(String dbName) { this.dbName = dbName; }
+        public String getTableName() { return tableName; }
+        public void setTableName(String tableName) { this.tableName = tableName; }
     }
 }

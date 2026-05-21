@@ -35,7 +35,7 @@ public class RoleController {
     }
 
     @PutMapping("/{roleId}")
-    public ApiResponse<Boolean> update(@PathVariable String roleId, @RequestBody RoleRequest request) {
+    public ApiResponse<Boolean> update(@PathVariable(name = "roleId") String roleId, @RequestBody RoleRequest request) {
         Role role = new Role();
         role.setRoleId(roleId);
         role.setRoleName(request.getRoleName());
@@ -48,7 +48,7 @@ public class RoleController {
     }
 
     @GetMapping("/{roleId}")
-    public ApiResponse<Role> getById(@PathVariable String roleId) {
+    public ApiResponse<Role> getById(@PathVariable(name = "roleId") String roleId) {
         return roleService.getById(roleId)
             .map(ApiResponse::success)
             .orElse(ApiResponse.error("ROLE_NOT_FOUND", "角色不存在"));
@@ -56,28 +56,28 @@ public class RoleController {
 
     @GetMapping
     public ApiResponse<Page<Role>> list(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
         List<Role> content = roleService.list(page, size);
         long total = roleService.count();
         return ApiResponse.success(new Page<>(content, total, page, size));
     }
 
     @DeleteMapping("/{roleId}")
-    public ApiResponse<Boolean> delete(@PathVariable String roleId) {
+    public ApiResponse<Boolean> delete(@PathVariable(name = "roleId") String roleId) {
         roleService.delete(roleId);
         return ApiResponse.success(true);
     }
 
     @GetMapping("/{roleId}/permissions")
-    public ApiResponse<List<String>> getPermissions(@PathVariable String roleId) {
+    public ApiResponse<List<String>> getPermissions(@PathVariable(name = "roleId") String roleId) {
         List<String> permissions = roleService.getPermissions(roleId);
         return ApiResponse.success(permissions);
     }
 
     @PutMapping("/{roleId}/permissions")
     public ApiResponse<Boolean> assignPermissions(
-            @PathVariable String roleId,
+            @PathVariable(name = "roleId") String roleId,
             @RequestBody List<String> permissionCodes) {
         roleService.assignPermissions(roleId, permissionCodes);
         return ApiResponse.success(true);

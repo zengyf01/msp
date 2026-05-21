@@ -92,7 +92,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import {
-  HomeFilled, List, Link, Collection, Document, Setting, SwitchButton
+  HomeFilled, List, Link, Collection, Document, Setting, SwitchButton, Grid
 } from '@element-plus/icons-vue'
 
 const route = useRoute()

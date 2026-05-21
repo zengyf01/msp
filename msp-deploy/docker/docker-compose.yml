@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # MySQL 数据库
+  # MySQL 数据库（主库，存储MSP元数据）
   mysql:
     image: mysql:8
     environment:
@@ -84,6 +84,121 @@ services:
     depends_on:
       - gateway
 
+  # ==========================================
+  # 模拟节点 A（参与方A）
+  # ==========================================
+  node-a-db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: nodea123
+      MYSQL_DATABASE: node_a_data
+    ports:
+      - "3307:3306"
+    volumes:
+      - node_a_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - msp-network
+
+  node-a:
+    build:
+      context: ../../msp-node
+      dockerfile: Dockerfile
+    ports:
+      - "50051:50051"
+    depends_on:
+      - node-a-db
+    environment:
+      - NODE_ID=node-a
+      - NODE_NAME=参与方A
+      - DB_HOST=node-a-db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=nodea123
+      - DB_NAME=node_a_data
+      - GRPC_PORT=50051
+    networks:
+      - msp-network
+
+  # ==========================================
+  # 模拟节点 B（参与方B）
+  # ==========================================
+  node-b-db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: nodeb123
+      MYSQL_DATABASE: node_b_data
+    ports:
+      - "3308:3306"
+    volumes:
+      - node_b_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - msp-network
+
+  node-b:
+    build:
+      context: ../../msp-node
+      dockerfile: Dockerfile
+    ports:
+      - "50052:50051"
+    depends_on:
+      - node-b-db
+    environment:
+      - NODE_ID=node-b
+      - NODE_NAME=参与方B
+      - DB_HOST=node-b-db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=nodeb123
+      - DB_NAME=node_b_data
+      - GRPC_PORT=50051
+    networks:
+      - msp-network
+
+  # ==========================================
+  # 模拟节点 C（用于PSI等三方场景）
+  # ==========================================
+  node-c-db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: nodec123
+      MYSQL_DATABASE: node_c_data
+    ports:
+      - "3310:3306"
+    volumes:
+      - node_c_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - msp-network
+
+  node-c:
+    build:
+      context: ../../msp-node
+      dockerfile: Dockerfile
+    ports:
+      - "50053:50051"
+    depends_on:
+      - node-c-db
+    environment:
+      - NODE_ID=node-c
+      - NODE_NAME=参与方C
+      - DB_HOST=node-c-db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=nodec123
+      - DB_NAME=node_c_data
+      - GRPC_PORT=50051
+    networks:
+      - msp-network
+
+networks:
+  msp-network:
+    driver: bridge
+
 volumes:
   mysql_data:
   kuscia_data:
+  node_a_data:
+  node_b_data:
+  node_c_data:

@@ -123,7 +123,7 @@
         </el-table-column>
         <el-table-column prop="status" label="状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">{{ row.status }}</el-tag>
+            <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180">
@@ -201,11 +201,21 @@ const loadStats = async () => {
     updatePieChart()
 
     // 加载节点统计
+    // 合并真实节点和模拟节点
     const nodeRes = await nodeAPI.listNodes({ page: 0, size: 100 })
-    const nodeList = nodeRes.data?.data?.content || []
-    nodes.value = nodeList
-    stats.totalNodes = nodeList.length
-    stats.onlineNodes = nodeList.filter((n: Node) => n.status === 'ONLINE').length
+    const realNodeList = nodeRes.data?.data?.content || []
+
+    // 模拟节点（总是在线）
+    const simulatedNodeList = [
+      { nodeId: 'node-a', nodeName: '数据中心A', status: 'ONLINE', capabilities: ['PYU', 'SPU'] },
+      { nodeId: 'node-b', nodeName: '数据中心B', status: 'ONLINE', capabilities: ['PYU', 'SPU'] },
+      { nodeId: 'node-c', nodeName: '数据中心C', status: 'ONLINE', capabilities: ['PYU', 'SPU'] }
+    ]
+
+    const allNodes = [...simulatedNodeList, ...realNodeList]
+    nodes.value = allNodes
+    stats.totalNodes = allNodes.length
+    stats.onlineNodes = allNodes.filter((n: any) => n.status === 'ONLINE').length
   } catch (error) {
     console.error('Failed to load stats:', error)
   }
@@ -282,6 +292,18 @@ const getStatusType = (status: TaskStatus) => {
     CANCELLED: 'info'
   }
   return map[status] || 'info'
+}
+
+const getStatusLabel = (status: TaskStatus) => {
+  const labels: Record<TaskStatus, string> = {
+    CREATED: '已创建',
+    PENDING: '等待中',
+    RUNNING: '运行中',
+    COMPLETED: '已完成',
+    FAILED: '失败',
+    CANCELLED: '已取消'
+  }
+  return labels[status] || status
 }
 
 const getNodeStatusType = (status: NodeStatus) => {

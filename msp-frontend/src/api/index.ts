@@ -50,7 +50,7 @@ export const taskAPI = {
   getTaskStatus: (taskId: string) =>
     api.get<{ data: TaskStatusResponse }>(`/tasks/${taskId}/status`),
 
-  cancelTask: (taskId: string) =>
+  deleteTask: (taskId: string) =>
     api.delete<{ data: boolean }>(`/tasks/${taskId}`),
 
   getTaskResult: (taskId: string) =>
@@ -59,8 +59,8 @@ export const taskAPI = {
   retryTask: (taskId: string) =>
     api.post<{ data: { taskId: string; status: string } }>(`/tasks/${taskId}/retry`),
 
-  updateTask: (taskId: string, data: TaskRequest) =>
-    api.put<{ data: boolean }>(`/tasks/${taskId}`, data)
+  cancelTask: (taskId: string) =>
+    api.delete<{ data: boolean }>(`/tasks/${taskId}/cancel`),
 }
 
 // 节点相关API
@@ -81,7 +81,7 @@ export const nodeAPI = {
     api.delete<{ data: boolean }>(`/nodes/${nodeId}`)
 }
 
-// 数据源相关API
+// 数据源相关API - 包含模拟节点创建
 export const dataSourceAPI = {
   createDataSource: (data: DataSourceRequest) =>
     api.post<{ data: DataSourceCreateResponse }>('/datasources', data),
@@ -102,7 +102,21 @@ export const dataSourceAPI = {
     api.post<{ data: ConnectionTestResponse }>('/datasources/test-connection', data),
 
   getDataSourcesByNode: (nodeId: string) =>
-    api.get<{ data: DataSource[] }>(`/datasources/by-node/${nodeId}`)
+    api.get<{ data: DataSource[] }>(`/datasources/by-node/${nodeId}`),
+
+  createSimulatedNode: (params: {
+    nodeId: string
+    dbName: string
+    tableName: string
+    columnName: string
+  }) =>
+    api.post<{ data: boolean }>('/datasources/simulate', params),
+
+  getDataSourceSampleData: (dbName: string, tableName: string) =>
+    api.post<{ data: any[] }>('/datasources/sample-data', { dbName, tableName }),
+
+  deleteSimulatedNode: (nodeId: string) =>
+    api.delete<{ data: boolean }>(`/datasources/simulate/${nodeId}`)
 }
 
 // 认证相关API

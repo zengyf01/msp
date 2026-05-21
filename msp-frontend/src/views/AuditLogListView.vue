@@ -26,24 +26,22 @@
     </div>
 
     <el-table :data="auditLogs" v-loading="loading" style="width: 100%">
-      <el-table-column prop="logId" label="日志ID" width="220" />
-      <el-table-column prop="userId" label="用户ID" width="150" />
-      <el-table-column prop="action" label="操作" width="120">
+      <el-table-column prop="userId" label="用户" min-width="100" />
+      <el-table-column prop="action" label="操作" width="100">
         <template #default="{ row }">
-          <el-tag>{{ row.action }}</el-tag>
+          <el-tag>{{ getActionLabel(row.action) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="resourceType" label="资源类型" width="120" />
-      <el-table-column prop="resourceId" label="资源ID" width="180" />
+      <el-table-column prop="resourceType" label="资源类型" width="100" />
       <el-table-column prop="ipAddress" label="IP地址" width="130" />
-      <el-table-column prop="createTime" label="时间" width="180">
+      <el-table-column prop="createTime" label="时间" min-width="180">
         <template #default="{ row }">
           {{ formatTime(row.createTime) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作">
+      <el-table-column label="操作" width="80" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="viewDetails(row)">详情</el-button>
+          <el-button size="small" text type="primary" @click="viewDetails(row)">详情</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -59,14 +57,12 @@
     </div>
 
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailsVisible" title="日志详情" width="600px">
+    <el-dialog v-model="detailsVisible" title="日志详情" width="550px">
       <el-descriptions v-if="currentLog" :column="1" border>
-        <el-descriptions-item label="日志ID">{{ currentLog.logId }}</el-descriptions-item>
-        <el-descriptions-item label="用户ID">{{ currentLog.userId }}</el-descriptions-item>
-        <el-descriptions-item label="操作">{{ currentLog.action }}</el-descriptions-item>
+        <el-descriptions-item label="用户">{{ currentLog.userId }}</el-descriptions-item>
+        <el-descriptions-item label="操作">{{ getActionLabel(currentLog.action) }}</el-descriptions-item>
         <el-descriptions-item label="资源类型">{{ currentLog.resourceType }}</el-descriptions-item>
-        <el-descriptions-item label="资源ID">{{ currentLog.resourceId }}</el-descriptions-item>
-        <el-descriptions-item label="IP地址">{{ currentLog.ipAddress }}</el-descriptions-item>
+        <el-descriptions-item label="IP地址">{{ currentLog.ipAddress || '-' }}</el-descriptions-item>
         <el-descriptions-item label="时间">{{ formatTime(currentLog.createTime) }}</el-descriptions-item>
         <el-descriptions-item label="详情">
           <pre>{{ JSON.stringify(currentLog.details, null, 2) }}</pre>
@@ -160,6 +156,19 @@ const viewDetails = (log: AuditLog) => {
 const formatTime = (timestamp: number) => {
   if (!timestamp) return '-'
   return new Date(timestamp).toLocaleString('zh-CN')
+}
+
+const getActionLabel = (action: string) => {
+  const labels: Record<string, string> = {
+    LOGIN: '登录',
+    LOGOUT: '登出',
+    CREATE_TASK: '创建任务',
+    CANCEL_TASK: '取消任务',
+    DELETE_TASK: '删除任务',
+    REGISTER_NODE: '注册节点',
+    UNREGISTER_NODE: '注销节点'
+  }
+  return labels[action] || action
 }
 </script>
 

@@ -31,6 +31,12 @@ public interface TaskScheduler {
     boolean cancelTask(String taskId);
 
     /**
+     * 删除任务
+     * @param taskId 任务ID
+     */
+    void deleteTask(String taskId);
+
+    /**
      * 重试任务（创建新任务）
      * @param taskId 原任务ID
      * @return 新任务ID

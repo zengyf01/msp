@@ -93,6 +93,13 @@ public class TaskSchedulerImpl implements TaskScheduler {
     }
 
     @Override
+    public void deleteTask(String taskId) {
+        taskRepository.findById(taskId)
+            .orElseThrow(() -> new MspException(ErrorCode.TASK_NOT_FOUND, "Task not found: " + taskId));
+        taskRepository.delete(taskId);
+    }
+
+    @Override
     public String retryTask(String taskId) {
         Task task = taskRepository.findById(taskId)
             .orElseThrow(() -> new MspException(ErrorCode.TASK_NOT_FOUND, "Task not found: " + taskId));

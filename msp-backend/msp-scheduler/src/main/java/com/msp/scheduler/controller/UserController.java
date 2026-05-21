@@ -34,7 +34,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}")
-    public ApiResponse<Boolean> update(@PathVariable String userId, @RequestBody UserUpdateRequest request) {
+    public ApiResponse<Boolean> update(@PathVariable(name = "userId") String userId, @RequestBody UserUpdateRequest request) {
         User user = new User();
         user.setUserId(userId);
         user.setEmail(request.getEmail());
@@ -47,7 +47,7 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
-    public ApiResponse<User> getById(@PathVariable String userId) {
+    public ApiResponse<User> getById(@PathVariable(name = "userId") String userId) {
         return userService.getUser(userId)
             .map(ApiResponse::success)
             .orElse(ApiResponse.error("USER_NOT_FOUND", "用户不存在"));
@@ -55,39 +55,39 @@ public class UserController {
 
     @GetMapping
     public ApiResponse<Page<User>> list(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
         List<User> content = userService.listUsers(page, size);
         long total = userService.countUsers();
         return ApiResponse.success(new Page<>(content, total, page, size));
     }
 
     @DeleteMapping("/{userId}")
-    public ApiResponse<Boolean> delete(@PathVariable String userId) {
+    public ApiResponse<Boolean> delete(@PathVariable(name = "userId") String userId) {
         userService.deleteUser(userId);
         return ApiResponse.success(true);
     }
 
     @PutMapping("/{userId}/password")
-    public ApiResponse<Boolean> resetPassword(@PathVariable String userId, @RequestBody ResetPasswordRequest request) {
+    public ApiResponse<Boolean> resetPassword(@PathVariable(name = "userId") String userId, @RequestBody ResetPasswordRequest request) {
         userService.resetPassword(userId, request.getPassword());
         return ApiResponse.success(true);
     }
 
     @PutMapping("/{userId}/status")
-    public ApiResponse<Boolean> setEnabled(@PathVariable String userId, @RequestBody SetEnabledRequest request) {
+    public ApiResponse<Boolean> setEnabled(@PathVariable(name = "userId") String userId, @RequestBody SetEnabledRequest request) {
         userService.setUserEnabled(userId, request.getEnabled());
         return ApiResponse.success(true);
     }
 
     @PutMapping("/{userId}/roles")
-    public ApiResponse<Boolean> assignRoles(@PathVariable String userId, @RequestBody List<String> roleIds) {
+    public ApiResponse<Boolean> assignRoles(@PathVariable(name = "userId") String userId, @RequestBody List<String> roleIds) {
         userService.assignRoles(userId, roleIds);
         return ApiResponse.success(true);
     }
 
     @GetMapping("/{userId}/roles")
-    public ApiResponse<List<String>> getRoles(@PathVariable String userId) {
+    public ApiResponse<List<String>> getRoles(@PathVariable(name = "userId") String userId) {
         List<String> roles = userService.getUserRoles(userId);
         return ApiResponse.success(roles);
     }

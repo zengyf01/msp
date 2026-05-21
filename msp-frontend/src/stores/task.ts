@@ -55,6 +55,11 @@ export const useTaskStore = defineStore('task', () => {
     return res.data.data
   }
 
+  async function deleteTask(taskId: string) {
+    await taskAPI.deleteTask(taskId)
+    await fetchTasks()
+  }
+
   function clearCurrentTask() {
     currentTask.value = null
   }
@@ -70,6 +75,7 @@ export const useTaskStore = defineStore('task', () => {
     cancelTask,
     getTaskResult,
     retryTask,
+    deleteTask,
     clearCurrentTask
   }
 })

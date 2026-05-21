@@ -59,4 +59,30 @@ public interface DataSourceService {
      * @return 是否连接成功
      */
     boolean testConnection(DataSource dataSource);
+
+    /**
+     * 创建模拟节点（演示用）
+     * 在数据库中创建节点数据库、示例数据表
+     * @param nodeId 节点ID
+     * @param dbName 数据库名
+     * @param tableName 表名
+     * @param columnName 匹配用列名
+     * @return 创建成功返回true
+     */
+    boolean createSimulatedNode(String nodeId, String dbName, String tableName, String columnName);
+
+    /**
+     * 删除模拟节点（演示用）
+     * @param nodeId 节点ID
+     * @return 删除成功返回true
+     */
+    boolean deleteSimulatedNode(String nodeId);
+
+    /**
+     * 获取模拟节点示例数据
+     * @param dbName 数据库名
+     * @param tableName 表名
+     * @return 示例数据列表（每行是一个列表）
+     */
+    List<List<Object>> getSimulatedNodeSampleData(String dbName, String tableName);
 }

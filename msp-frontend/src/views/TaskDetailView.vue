@@ -4,16 +4,15 @@
       <template #header>
         <div class="header">
           <h2>任务详情</h2>
-          <el-tag :type="getStatusType(task.status)">{{ task.status }}</el-tag>
+          <el-tag :type="getStatusType(task.status)">{{ getStatusLabel(task.status) }}</el-tag>
         </div>
       </template>
 
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="任务ID">{{ task.taskId }}</el-descriptions-item>
         <el-descriptions-item label="任务名称">{{ task.name }}</el-descriptions-item>
         <el-descriptions-item label="任务类型">{{ task.type }}</el-descriptions-item>
         <el-descriptions-item label="算法">{{ task.algorithm || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ task.status }}</el-descriptions-item>
+        <el-descriptions-item label="状态">{{ getStatusLabel(task.status) }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ formatTime(task.createTime) }}</el-descriptions-item>
         <el-descriptions-item label="参与节点" :span="2">
           {{ task.participants?.join(', ') || '-' }}
@@ -102,6 +101,18 @@ const getStatusType = (status: TaskStatus) => {
     CANCELLED: 'info'
   }
   return map[status] || 'info'
+}
+
+const getStatusLabel = (status: TaskStatus) => {
+  const labels: Record<TaskStatus, string> = {
+    CREATED: '已创建',
+    PENDING: '等待中',
+    RUNNING: '运行中',
+    COMPLETED: '已完成',
+    FAILED: '失败',
+    CANCELLED: '已取消'
+  }
+  return labels[status] || status
 }
 
 const goBack = () => {

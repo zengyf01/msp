@@ -11,7 +11,8 @@ import signal
 import sys
 
 # 导入msp_node模块
-sys.path.insert(0, '/d/project/msp/msp-node/src')
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from msp_node.protos import msp_node_pb2, msp_node_pb2_grpc
 from msp_node.runners.psi_runner import PSIRunner

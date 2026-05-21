@@ -2,9 +2,11 @@ package com.msp.node.controller;
 
 import com.msp.common.core.*;
 import com.msp.node.repository.NodeRepository;
+import com.msp.node.service.AuditLogService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -15,16 +17,19 @@ import java.util.Set;
 public class NodeController {
 
     private final NodeRepository nodeRepository;
+    private final AuditLogService auditLogService;
 
-    public NodeController(NodeRepository nodeRepository) {
+    public NodeController(NodeRepository nodeRepository, AuditLogService auditLogService) {
         this.nodeRepository = nodeRepository;
+        this.auditLogService = auditLogService;
     }
 
     /**
      * 注册节点
      */
     @PostMapping("/register")
-    public ApiResponse<NodeRegisterResponse> registerNode(@RequestBody NodeRegisterRequest request) {
+    public ApiResponse<NodeRegisterResponse> registerNode(@RequestBody NodeRegisterRequest request,
+                                                          @RequestHeader(value = "X-User-Id", required = false) String userId) {
         long now = System.currentTimeMillis();
 
         Node node = new Node();
@@ -38,6 +43,10 @@ public class NodeController {
         node.setUpdateTime(now);
 
         nodeRepository.save(node);
+
+        // 记录审计日志
+        auditLogService.log(userId != null ? userId : "system", "REGISTER_NODE", "NODE", request.getNodeId(),
+            Map.of("nodeName", request.getNodeName(), "endpoint", request.getEndpoint() != null ? request.getEndpoint() : ""), null);
 
         return ApiResponse.success(new NodeRegisterResponse(node.getNodeId(), node.getStatus()));
     }
@@ -60,7 +69,7 @@ public class NodeController {
      * 查询节点状态
      */
     @GetMapping("/{nodeId}")
-    public ApiResponse<Node> getNode(@PathVariable String nodeId) {
+    public ApiResponse<Node> getNode(@PathVariable(name = "nodeId") String nodeId) {
         Node node = nodeRepository.findById(nodeId)
             .orElseThrow(() -> new MspException(ErrorCode.NODE_NOT_FOUND, "Node not found: " + nodeId));
         return ApiResponse.success(node);
@@ -70,7 +79,7 @@ public class NodeController {
      * 心跳上报
      */
     @PostMapping("/{nodeId}/heartbeat")
-    public ApiResponse<Boolean> heartbeat(@PathVariable String nodeId) {
+    public ApiResponse<Boolean> heartbeat(@PathVariable(name = "nodeId") String nodeId) {
         if (nodeRepository.findById(nodeId).isEmpty()) {
             throw new MspException(ErrorCode.NODE_NOT_FOUND, "Node not found: " + nodeId);
         }
@@ -82,11 +91,17 @@ public class NodeController {
      * 注销节点
      */
     @DeleteMapping("/{nodeId}")
-    public ApiResponse<Boolean> unregisterNode(@PathVariable String nodeId) {
+    public ApiResponse<Boolean> unregisterNode(@PathVariable(name = "nodeId") String nodeId,
+                                               @RequestHeader(value = "X-User-Id", required = false) String userId) {
         if (nodeRepository.findById(nodeId).isEmpty()) {
             throw new MspException(ErrorCode.NODE_NOT_FOUND, "Node not found: " + nodeId);
         }
         nodeRepository.delete(nodeId);
+
+        // 记录审计日志
+        auditLogService.log(userId != null ? userId : "system", "UNREGISTER_NODE", "NODE", nodeId,
+            Map.of("success", true), null);
+
         return ApiResponse.success(true);
     }
 

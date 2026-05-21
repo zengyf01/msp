@@ -88,6 +88,142 @@ public class DataSourceServiceImpl implements DataSourceService {
         }
     }
 
+    @Override
+    public boolean createSimulatedNode(String nodeId, String dbName, String tableName, String columnName) {
+        // 检查是否为本地测试环境（演示功能仅限本地）
+        String hostname = System.getenv("COMPUTERNAME");
+        if (hostname == null) {
+            hostname = System.getenv("HOSTNAME");
+        }
+
+        try {
+            // 连接主数据库（使用root用户，因为需要创建数据库和用户）
+            String masterUrl = "jdbc:mysql://mysql:3306?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai";
+            try (Connection masterConn = DriverManager.getConnection(masterUrl, "root", "root123456")) {
+                // 创建节点数据库
+                String createDbSql = String.format("CREATE DATABASE IF NOT EXISTS %s", dbName);
+                masterConn.createStatement().execute(createDbSql);
+
+                // 创建用户并授权
+                String createUserSql = String.format(
+                    "CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s123'",
+                    dbName.replace("_db", "").replace("node_", "node"),
+                    dbName.replace("_db", "").replace("node_", "node")
+                );
+                masterConn.createStatement().execute(createUserSql);
+
+                String grantSql = String.format(
+                    "GRANT ALL PRIVILEGES ON %s.* TO '%s'@'%%'",
+                    dbName,
+                    dbName.replace("_db", "").replace("node_", "node")
+                );
+                masterConn.createStatement().execute(grantSql);
+                masterConn.createStatement().execute("FLUSH PRIVILEGES");
+
+                // 切换到节点数据库
+                masterConn.createStatement().execute("USE " + dbName);
+
+                // 创建示例数据表
+                String createTableSql;
+                if ("id_card".equals(columnName)) {
+                    createTableSql = String.format(
+                        "CREATE TABLE IF NOT EXISTS %s (" +
+                        "  id INT PRIMARY KEY AUTO_INCREMENT," +
+                        "  name VARCHAR(50)," +
+                        "  %s VARCHAR(20)," +
+                        "  email VARCHAR(100)" +
+                        ")",
+                        tableName, columnName
+                    );
+                } else {
+                    createTableSql = String.format(
+                        "CREATE TABLE IF NOT EXISTS %s (" +
+                        "  id INT PRIMARY KEY AUTO_INCREMENT," +
+                        "  username VARCHAR(50)," +
+                        "  %s VARCHAR(20)," +
+                        "  address VARCHAR(200)" +
+                        ")",
+                        tableName, columnName
+                    );
+                }
+                masterConn.createStatement().execute(createTableSql);
+
+                // 插入示例数据
+                String insertSql;
+                if ("id_card".equals(columnName)) {
+                    insertSql = String.format(
+                        "INSERT INTO %s (name, %s, email) VALUES " +
+                        "('张三', '110101199001011234', 'zhangsan@example.com')," +
+                        "('李四', '110101199001011235', 'lisi@example.com')," +
+                        "('王五', '110101199001011236', 'wangwu@example.com')," +
+                        "('赵六', '110101199001011237', 'zhaoliu@example.com')",
+                        tableName, columnName
+                    );
+                } else {
+                    insertSql = String.format(
+                        "INSERT INTO %s (username, %s, address) VALUES " +
+                        "('Alice', '13800138001', '北京市朝阳区')," +
+                        "('Bob', '13800138002', '上海市浦东新区')," +
+                        "('Charlie', '13800138003', '广州市天河区')," +
+                        "('David', '13800138004', '深圳市南山区')",
+                        tableName, columnName
+                    );
+                }
+                masterConn.createStatement().execute(insertSql);
+            }
+            return true;
+        } catch (Exception e) {
+            throw new RuntimeException("创建模拟节点失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public boolean deleteSimulatedNode(String nodeId) {
+        try {
+            String masterUrl = "jdbc:mysql://mysql:3306?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai";
+            try (Connection masterConn = DriverManager.getConnection(masterUrl, "root", "root123456")) {
+                // Docker Compose 模拟节点（node-a, node-b, node-c）
+                if (nodeId.matches("node-[abc]")) {
+                    String dbName = "node_" + nodeId.split("-")[1] + "_data";
+                    masterConn.createStatement().execute("DROP DATABASE IF EXISTS " + dbName);
+                } else {
+                    // 后端API创建的模拟节点
+                    String dbName = "node_" + nodeId.split("-")[1] + "_db";
+                    masterConn.createStatement().execute("DROP DATABASE IF EXISTS " + dbName);
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            throw new RuntimeException("删除模拟节点失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public List<List<Object>> getSimulatedNodeSampleData(String dbName, String tableName) {
+        try {
+            String url = String.format("jdbc:mysql://mysql:3306/%s?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai", dbName);
+            String dbUser = dbName.replace("_db", "").replace("node_", "node");
+            try (Connection conn = DriverManager.getConnection(url, dbUser, dbUser + "123")) {
+                var stmt = conn.createStatement();
+                var rs = stmt.executeQuery("SELECT * FROM " + tableName + " LIMIT 10");
+                var meta = rs.getMetaData();
+                int colCount = meta.getColumnCount();
+
+                java.util.List<List<Object>> result = new java.util.ArrayList<>();
+                while (rs.next()) {
+                    List<Object> row = new java.util.ArrayList<>();
+                    for (int i = 1; i <= colCount; i++) {
+                        row.add(rs.getObject(i));
+                    }
+                    result.add(row);
+                }
+                return result;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("获取示例数据失败: " + e.getMessage(), e);
+        }
+    }
+
     private boolean testMySQLConnection(DataSource ds) {
         String url = String.format("jdbc:mysql://%s:%d/%s",
             ds.getHost(), ds.getPort() != null ? ds.getPort() : 3306, ds.getDatabase());
