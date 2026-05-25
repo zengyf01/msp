@@ -21,7 +21,10 @@ public class TaskSpecGenerator {
         TaskType.PSI, "psi",
         TaskType.MPC, "mpc",
         TaskType.FEDERATED_LEARNING, "fl",
-        TaskType.VERTICAL_FL, "vertical_fl"
+        TaskType.VERTICAL_FL, "vertical_fl",
+        TaskType.COMPOUND_TASK, "compound",
+        TaskType.COMPONENT_DAG, "component_dag",
+        TaskType.CUSTOM_CODE, "custom_code"
     );
 
     private static final int DEFAULT_TIMEOUT_SECONDS = 3600;

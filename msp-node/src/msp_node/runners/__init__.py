@@ -5,6 +5,8 @@ from .custom_code_runner import CustomCodeRunner
 from .sgb_runner import SGBRunner
 from .dag_executor import DAGExecutor
 from .compound_runner import CompoundRunner
+from .multi_party_psi_runner import MultiPartyPSIRunner
+from .statistics_runner import StatisticsRunner
 
 __all__ = [
     "PSIRunner",
@@ -14,4 +16,6 @@ __all__ = [
     "SGBRunner",
     "DAGExecutor",
     "CompoundRunner",
+    "MultiPartyPSIRunner",
+    "StatisticsRunner",
 ]

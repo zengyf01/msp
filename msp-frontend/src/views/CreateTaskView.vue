@@ -113,6 +113,10 @@
                   :value="node.nodeId"
                 />
               </el-select>
+              <div class="form-tip" v-if="form.participants.length >= 3">
+                <el-tag type="success" size="small">多方模式: {{ form.participants.length }} 方</el-tag>
+                <span class="tip-text">已选择 {{ form.participants.length }} 个参与方，支持多方联合计算</span>
+              </div>
             </el-form-item>
 
             <el-form-item label="参数配置">
@@ -441,5 +445,17 @@ const goBack = () => {
 
 .feature-card {
   background-color: #f5f7fa;
+}
+
+.form-tip {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tip-text {
+  font-size: 12px;
+  color: #909399;
 }
 </style>
