@@ -185,6 +185,11 @@
             </el-form-item>
           </el-form>
         </el-tab-pane>
+
+        <!-- 组件 DAG 模式 -->
+        <el-tab-pane label="组件 DAG" name="dag">
+          <DAGDesignerView />
+        </el-tab-pane>
       </el-tabs>
     </el-card>
   </div>
@@ -197,6 +202,7 @@ import { ElMessage } from 'element-plus'
 import { useTaskStore } from '@/stores/task'
 import { useNodeStore } from '@/stores/node'
 import type { TaskRequest } from '@/types'
+import DAGDesignerView from './DAGDesignerView.vue'
 
 const router = useRouter()
 const taskStore = useTaskStore()

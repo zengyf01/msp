@@ -9,5 +9,6 @@ public enum TaskType {
     FEDERATED_LEARNING, // 联邦学习
     CUSTOM_CODE,      // 自定义代码
     VERTICAL_FL,      // 纵向联邦学习
-    COMPOUND_TASK     // 复合任务
+    COMPOUND_TASK,    // 复合任务
+    COMPONENT_DAG     // 组件DAG
 }
