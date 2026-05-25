@@ -21,9 +21,84 @@
                 <el-option label="PSI (隐私集合求交)" value="PSI" />
                 <el-option label="MPC (安全多方计算)" value="MPC" />
                 <el-option label="联邦学习" value="FEDERATED_LEARNING" />
+                <el-option label="纵向联邦学习" value="VERTICAL_FL" />
                 <el-option label="自定义代码" value="CUSTOM_CODE" />
               </el-select>
             </el-form-item>
+
+            <el-form-item label="MPC类型" v-if="form.type === 'MPC'" prop="mpcType">
+              <el-select v-model="form.mpcType" placeholder="选择MPC计算类型" style="width: 100%">
+                <el-option label="加法 (Addition)" value="addition" />
+                <el-option label="乘法 (Multiplication)" value="multiplication" />
+                <el-option label="比较 (Comparison)" value="comparison" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="PSI协议" v-if="form.type === 'PSI'" prop="psiProtocol">
+              <el-select v-model="form.psiProtocol" placeholder="选择PSI协议" style="width: 100%">
+                <el-option label="ECDH-PSI (默认)" value="ecdh" />
+                <el-option label="KKRT-PSI (百万级数据)" value="kkrt" />
+                <el-option label="BC22-PSI (千万级数据)" value="bc22" />
+                <el-option label="不平衡 PSI (大小集合)" value="unbalanced" />
+              </el-select>
+            </el-form-item>
+
+            <!-- 纵向联邦学习配置面板 -->
+            <template v-if="form.type === 'VERTICAL_FL'">
+              <el-form-item label="模型类型" prop="modelType">
+                <el-select v-model="form.modelType" placeholder="选择模型类型" style="width: 100%">
+                  <el-option label="逻辑回归 (Logistic Regression)" value="logistic_regression" />
+                  <el-option label="SecureBoost" value="secureboost" />
+                </el-select>
+              </el-form-item>
+
+              <el-form-item label="标签提供方" prop="labelParty">
+                <el-select v-model="form.labelParty" placeholder="选择标签提供方" style="width: 100%">
+                  <el-option
+                    v-for="node in form.participants"
+                    :key="node"
+                    :label="node"
+                    :value="node"
+                  />
+                </el-select>
+              </el-form-item>
+
+              <el-form-item label="标签列名" prop="labelColumn">
+                <el-input v-model="form.labelColumn" placeholder="输入标签列名，如 default_flag" />
+              </el-form-item>
+
+              <el-form-item label="参与方特征">
+                <el-card class="feature-card" shadow="never">
+                  <el-form-item
+                    v-for="party in form.participants"
+                    :key="party"
+                    :label="party + ' 特征列'"
+                  >
+                    <el-select
+                      v-model="form.featureParties[party]"
+                      multiple
+                      placeholder="选择特征列"
+                      style="width: 100%"
+                    >
+                      <el-option label="col_1" value="col_1" />
+                      <el-option label="col_2" value="col_2" />
+                      <el-option label="col_3" value="col_3" />
+                    </el-select>
+                  </el-form-item>
+                </el-card>
+              </el-form-item>
+
+              <!-- SecureBoost 专属参数 -->
+              <template v-if="form.modelType === 'secureboost'">
+                <el-form-item label="树数量">
+                  <el-input-number v-model="form.numTrees" :min="1" :max="100" />
+                </el-form-item>
+
+                <el-form-item label="最大深度">
+                  <el-input-number v-model="form.maxDepth" :min="1" :max="10" />
+                </el-form-item>
+              </template>
+            </template>
 
             <el-form-item label="算法" prop="algorithm">
               <el-input v-model="form.algorithm" placeholder="输入算法名称" />
@@ -141,7 +216,16 @@ const form = reactive<TaskRequest>({
   participants: [],
   inputs: {},
   parameters: {},
-  description: ''
+  description: '',
+  // 纵向联邦学习字段
+  labelParty: '',
+  labelColumn: '',
+  modelType: undefined,
+  featureParties: {},
+  numTrees: 10,
+  maxDepth: 6,
+  // PSI 协议
+  psiProtocol: 'ecdh'
 })
 
 // 自定义代码表单
@@ -260,6 +344,31 @@ const submitForm = async () => {
       }
     }
 
+    // 如果是MPC类型，添加到parameters
+    if (form.type === 'MPC' && form.mpcType) {
+      form.parameters = form.parameters || {}
+      form.parameters.mpcType = form.mpcType
+    }
+
+    // 如果是纵向联邦学习，序列化FL参数
+    if (form.type === 'VERTICAL_FL') {
+      form.parameters = form.parameters || {}
+      if (form.labelParty) form.parameters.labelParty = form.labelParty
+      if (form.labelColumn) form.parameters.labelColumn = form.labelColumn
+      if (form.modelType) form.parameters.modelType = form.modelType
+      if (form.featureParties) form.parameters.featureParties = JSON.stringify(form.featureParties)
+      if (form.modelType === 'secureboost') {
+        if (form.numTrees) form.parameters.numTrees = String(form.numTrees)
+        if (form.maxDepth) form.parameters.maxDepth = String(form.maxDepth)
+      }
+    }
+
+    // 如果是 PSI 类型，添加 psiType 参数
+    if (form.type === 'PSI' && form.psiProtocol) {
+      form.parameters = form.parameters || {}
+      form.parameters.psiType = form.psiProtocol
+    }
+
     const result = await taskStore.createTask(form)
     ElMessage.success('任务创建成功')
     router.push('/tasks')
@@ -322,5 +431,9 @@ const goBack = () => {
 
 :deep(.el-tab-pane) {
   padding: 20px 0;
+}
+
+.feature-card {
+  background-color: #f5f7fa;
 }
 </style>

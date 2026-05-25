@@ -93,6 +93,13 @@ export interface Task {
   updateTime: number;
 }
 
+// MPC计算类型
+export enum MpcType {
+  ADDITION = 'addition',
+  MULTIPLICATION = 'multiplication',
+  COMPARISON = 'comparison'
+}
+
 // 任务请求
 export interface TaskRequest {
   name: string;
@@ -102,6 +109,16 @@ export interface TaskRequest {
   inputs?: Record<string, DataSource>;
   parameters?: Record<string, string>;
   description?: string;
+  mpcType?: MpcType;
+  // 纵向联邦学习字段
+  labelParty?: string;
+  labelColumn?: string;
+  modelType?: 'logistic_regression' | 'secureboost';
+  featureParties?: Record<string, string[]>;
+  numTrees?: number;
+  maxDepth?: number;
+  // PSI 协议
+  psiProtocol?: 'ecdh' | 'kkrt' | 'bc22' | 'unbalanced';
 }
 
 // 节点
