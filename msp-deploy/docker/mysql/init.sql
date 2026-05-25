@@ -122,38 +122,38 @@ ON DUPLICATE KEY UPDATE username = username;
 -- 插入默认角色
 INSERT INTO msp_roles (role_id, role_code, role_name, description, status, create_time, update_time)
 VALUES
-    ('role-admin', 'ROLE_ADMIN', '管理员', '系统管理员，拥有所有权限', 'ACTIVE', NOW(), NOW()),
-    ('role-user', 'ROLE_USER', '普通用户', '普通用户，基本操作权限', 'ACTIVE', NOW(), NOW())
+    ('role-admin', 'ROLE_ADMIN', _utf8mb4'管理员', _utf8mb4'系统管理员，拥有所有权限', 'ACTIVE', NOW(), NOW()),
+    ('role-user', 'ROLE_USER', _utf8mb4'普通用户', _utf8mb4'普通用户，基本操作权限', 'ACTIVE', NOW(), NOW())
 ON DUPLICATE KEY UPDATE role_name = role_name;
 
 -- 插入默认权限（树形结构）
 INSERT INTO msp_permissions (permission_id, permission_code, permission_name, resource_type, parent_id, path, icon, sort_order)
 VALUES
     -- 系统管理菜单
-    ('perm-system', 'system', '系统管理', 'MENU', NULL, '/system', 'Setting', 100),
-    ('perm-users', 'system:user', '用户管理', 'MENU', 'perm-system', '/users', 'User', 1),
-    ('perm-users:view', 'system:user:view', '用户查看', 'BUTTON', 'perm-users', NULL, NULL, 0),
-    ('perm-users:create', 'system:user:create', '用户创建', 'BUTTON', 'perm-users', NULL, NULL, 1),
-    ('perm-users:update', 'system:user:update', '用户更新', 'BUTTON', 'perm-users', NULL, NULL, 2),
-    ('perm-users:delete', 'system:user:delete', '用户删除', 'BUTTON', 'perm-users', NULL, NULL, 3),
-    ('perm-roles', 'system:role', '角色管理', 'MENU', 'perm-system', '/roles', 'Key', 2),
-    ('perm-roles:view', 'system:role:view', '角色查看', 'BUTTON', 'perm-roles', NULL, NULL, 0),
-    ('perm-roles:create', 'system:role:create', '角色创建', 'BUTTON', 'perm-roles', NULL, NULL, 1),
-    ('perm-roles:update', 'system:role:update', '角色更新', 'BUTTON', 'perm-roles', NULL, NULL, 2),
-    ('perm-roles:delete', 'system:role:delete', '角色删除', 'BUTTON', 'perm-roles', NULL, NULL, 3),
-    ('perm-permissions', 'system:permission', '权限管理', 'MENU', 'perm-system', '/permissions', 'Lock', 3),
+    ('perm-system', 'system', _utf8mb4'系统管理', 'MENU', NULL, '/system', 'Setting', 100),
+    ('perm-users', 'system:user', _utf8mb4'用户管理', 'MENU', 'perm-system', '/users', 'User', 1),
+    ('perm-users:view', 'system:user:view', _utf8mb4'用户查看', 'BUTTON', 'perm-users', NULL, NULL, 0),
+    ('perm-users:create', 'system:user:create', _utf8mb4'用户创建', 'BUTTON', 'perm-users', NULL, NULL, 1),
+    ('perm-users:update', 'system:user:update', _utf8mb4'用户更新', 'BUTTON', 'perm-users', NULL, NULL, 2),
+    ('perm-users:delete', 'system:user:delete', _utf8mb4'用户删除', 'BUTTON', 'perm-users', NULL, NULL, 3),
+    ('perm-roles', 'system:role', _utf8mb4'角色管理', 'MENU', 'perm-system', '/roles', 'Key', 2),
+    ('perm-roles:view', 'system:role:view', _utf8mb4'角色查看', 'BUTTON', 'perm-roles', NULL, NULL, 0),
+    ('perm-roles:create', 'system:role:create', _utf8mb4'角色创建', 'BUTTON', 'perm-roles', NULL, NULL, 1),
+    ('perm-roles:update', 'system:role:update', _utf8mb4'角色更新', 'BUTTON', 'perm-roles', NULL, NULL, 2),
+    ('perm-roles:delete', 'system:role:delete', _utf8mb4'角色删除', 'BUTTON', 'perm-roles', NULL, NULL, 3),
+    ('perm-permissions', 'system:permission', _utf8mb4'权限管理', 'MENU', 'perm-system', '/permissions', 'Lock', 3),
     -- 业务菜单
-    ('perm-task', 'task', '任务管理', 'MENU', NULL, '/tasks', 'List', 1),
-    ('perm-task:view', 'task:view', '任务查看', 'BUTTON', 'perm-task', NULL, NULL, 0),
-    ('perm-task:create', 'task:create', '任务创建', 'BUTTON', 'perm-task', NULL, NULL, 1),
-    ('perm-task:cancel', 'task:cancel', '任务取消', 'BUTTON', 'perm-task', NULL, NULL, 2),
-    ('perm-node', 'node', '节点管理', 'MENU', NULL, '/nodes', 'Connection', 2),
-    ('perm-node:view', 'node:view', '节点查看', 'BUTTON', 'perm-node', NULL, NULL, 0),
-    ('perm-datasource', 'datasource', '数据源管理', 'MENU', NULL, '/datasources', 'Database', 3),
-    ('perm-datasource:view', 'datasource:view', '数据源查看', 'BUTTON', 'perm-datasource', NULL, NULL, 0),
-    ('perm-datasource:create', 'datasource:create', '数据源创建', 'BUTTON', 'perm-datasource', NULL, NULL, 1),
-    ('perm-audit', 'audit', '审计日志', 'MENU', NULL, '/audit-logs', 'Document', 4),
-    ('perm-audit:view', 'audit:view', '审计查看', 'BUTTON', 'perm-audit', NULL, NULL, 0)
+    ('perm-task', 'task', _utf8mb4'任务管理', 'MENU', NULL, '/tasks', 'List', 1),
+    ('perm-task:view', 'task:view', _utf8mb4'任务查看', 'BUTTON', 'perm-task', NULL, NULL, 0),
+    ('perm-task:create', 'task:create', _utf8mb4'任务创建', 'BUTTON', 'perm-task', NULL, NULL, 1),
+    ('perm-task:cancel', 'task:cancel', _utf8mb4'任务取消', 'BUTTON', 'perm-task', NULL, NULL, 2),
+    ('perm-node', 'node', _utf8mb4'节点管理', 'MENU', NULL, '/nodes', 'Connection', 2),
+    ('perm-node:view', 'node:view', _utf8mb4'节点查看', 'BUTTON', 'perm-node', NULL, NULL, 0),
+    ('perm-datasource', 'datasource', _utf8mb4'数据源管理', 'MENU', NULL, '/datasources', 'Database', 3),
+    ('perm-datasource:view', 'datasource:view', _utf8mb4'数据源查看', 'BUTTON', 'perm-datasource', NULL, NULL, 0),
+    ('perm-datasource:create', 'datasource:create', _utf8mb4'数据源创建', 'BUTTON', 'perm-datasource', NULL, NULL, 1),
+    ('perm-audit', 'audit', _utf8mb4'审计日志', 'MENU', NULL, '/audit-logs', 'Document', 4),
+    ('perm-audit:view', 'audit:view', _utf8mb4'审计查看', 'BUTTON', 'perm-audit', NULL, NULL, 0)
 ON DUPLICATE KEY UPDATE permission_name = permission_name;
 
 -- 给管理员角色分配所有权限

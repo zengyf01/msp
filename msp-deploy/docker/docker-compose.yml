@@ -41,7 +41,7 @@ services:
       - mysql
       - kuscia-master
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&collationConnection=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=msp
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-msp123456}
       - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
@@ -69,7 +69,7 @@ services:
     depends_on:
       - mysql
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&collationConnection=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=msp
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-msp123456}
       - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver

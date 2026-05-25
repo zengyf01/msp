@@ -20,13 +20,14 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await authAPI.login(request)
       if (res.data.success) {
-        token.value = res.data.data.token
+        const loginData = res.data.data
+        token.value = loginData.token
         user.value = {
-          userId: res.data.data.userId,
-          username: res.data.data.username,
-          role: res.data.data.role as any
+          userId: loginData.userId,
+          username: loginData.username,
+          role: loginData.role || loginData.user?.role || 'USER'
         }
-        localStorage.setItem(TOKEN_KEY, res.data.data.token)
+        localStorage.setItem(TOKEN_KEY, loginData.token)
         localStorage.setItem(USER_KEY, JSON.stringify(user.value))
         return true
       }

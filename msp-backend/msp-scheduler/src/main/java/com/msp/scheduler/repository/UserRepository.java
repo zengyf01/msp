@@ -49,7 +49,7 @@ public class UserRepository {
             user.getPassword(),
             user.getRole() != null ? user.getRole().name() : User.UserRole.USER.name(),
             user.isEnabled(),
-            System.currentTimeMillis(),
+            new java.sql.Timestamp(System.currentTimeMillis()),
             user.getUserId()
         );
     }

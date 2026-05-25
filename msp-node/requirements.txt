@@ -1,5 +1,5 @@
 # Requirements for MSP Node
-secretflow==1.11.0b1
+secretflow==1.14.0b0
 grpcio==1.56.2
 grpcio-tools==1.56.2
 protobuf>=3.25.0

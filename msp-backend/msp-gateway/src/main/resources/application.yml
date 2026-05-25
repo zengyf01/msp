@@ -36,6 +36,10 @@ spring:
           uri: http://scheduler:8081
           predicates:
             - Path=/api/v1/msp/permissions/**
+        - id: scheduler-system-config
+          uri: http://scheduler:8081
+          predicates:
+            - Path=/api/v1/msp/system-config/**
       globalcors:
         cors-configurations:
           '[/**]':
@@ -53,6 +57,13 @@ spring:
 
 server:
   port: 8090
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+      force-request: true
+      force-response: true
 
 # JWT配置
 jwt:

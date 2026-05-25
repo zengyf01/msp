@@ -20,7 +20,8 @@ public class TaskSpecGenerator {
     private static final Map<TaskType, String> TASK_TYPE_MAP = Map.of(
         TaskType.PSI, "psi",
         TaskType.MPC, "mpc",
-        TaskType.FEDERATED_LEARNING, "fl"
+        TaskType.FEDERATED_LEARNING, "fl",
+        TaskType.VERTICAL_FL, "vertical_fl"
     );
 
     private static final int DEFAULT_TIMEOUT_SECONDS = 3600;
@@ -55,6 +56,16 @@ public class TaskSpecGenerator {
         annotations.put("msp.task.id", taskId);
         annotations.put("msp.task.type", request.getType() != null ? request.getType().name() : "");
         annotations.put("msp.algorithm", request.getAlgorithm() != null ? request.getAlgorithm() : "");
+        // 纵向联邦学习相关 annotations
+        if (request.getLabelParty() != null) {
+            annotations.put("msp.label.party", request.getLabelParty());
+        }
+        if (request.getLabelColumn() != null) {
+            annotations.put("msp.label.column", request.getLabelColumn());
+        }
+        if (request.getModelType() != null) {
+            annotations.put("msp.model.type", request.getModelType());
+        }
         return annotations;
     }
 

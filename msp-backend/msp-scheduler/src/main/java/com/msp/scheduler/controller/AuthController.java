@@ -38,17 +38,19 @@ public class AuthController {
         User user = (User) result.getData();
         Map<String, Object> data = new HashMap<>();
         data.put("token", result.getToken());
-        data.put("user", Map.of(
+        Map<String, Object> userMap = Map.of(
             "userId", user.getUserId(),
             "username", user.getUsername(),
             "role", user.getRole() != null ? user.getRole().name() : "USER"
-        ));
+        );
+        data.put("user", userMap);
 
         // 记录登录审计日志
         auditLogService.log(user.getUserId(), "LOGIN", "AUTH", user.getUserId(),
             Map.of("username", request.getUsername(), "success", true), ip);
 
-        return ApiResponse.success(new LoginResponse(result.getToken(), user.getUserId(), user.getUsername()));
+        String roleValue = user.getRole() != null ? user.getRole().name() : "USER";
+        return ApiResponse.success(new LoginResponse(result.getToken(), user.getUserId(), user.getUsername(), roleValue));
     }
 
     /**
@@ -110,15 +112,18 @@ public class AuthController {
         private String token;
         private String userId;
         private String username;
+        private String role;
 
-        public LoginResponse(String token, String userId, String username) {
+        public LoginResponse(String token, String userId, String username, String role) {
             this.token = token;
             this.userId = userId;
             this.username = username;
+            this.role = role;
         }
 
         public String getToken() { return token; }
         public String getUserId() { return userId; }
         public String getUsername() { return username; }
+        public String getRole() { return role; }
     }
 }

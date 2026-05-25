@@ -2,13 +2,20 @@ spring:
   application:
     name: msp-scheduler
   datasource:
-    url: jdbc:mysql://localhost:3306/msp_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3306/msp_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
     username: msp
     password: msp123456
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 server:
   port: 8081
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+      force-request: true
+      force-response: true
 
 # JWT配置
 jwt:
