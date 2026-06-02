@@ -40,6 +40,16 @@ export const useTaskStore = defineStore('task', () => {
     return res.data.data
   }
 
+  async function saveDag(request: TaskRequest) {
+    const res = await taskAPI.saveDag(request)
+    return res.data.data
+  }
+
+  async function executeTask(taskId: string) {
+    const res = await taskAPI.executeTask(taskId)
+    return res.data.data
+  }
+
   async function cancelTask(taskId: string) {
     await taskAPI.cancelTask(taskId)
     await fetchTasks()
@@ -72,6 +82,8 @@ export const useTaskStore = defineStore('task', () => {
     fetchTasks,
     fetchTask,
     createTask,
+    saveDag,
+    executeTask,
     cancelTask,
     getTaskResult,
     retryTask,

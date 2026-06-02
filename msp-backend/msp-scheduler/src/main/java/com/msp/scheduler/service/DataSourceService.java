@@ -85,4 +85,19 @@ public interface DataSourceService {
      * @return 示例数据列表（每行是一个列表）
      */
     List<List<Object>> getSimulatedNodeSampleData(String dbName, String tableName);
+
+    /**
+     * 获取数据源的所有表名
+     * @param datasourceId 数据源ID
+     * @return 表名列表
+     */
+    List<String> getDataSourceTables(String datasourceId);
+
+    /**
+     * 获取数据源的表字段信息
+     * @param datasourceId 数据源ID
+     * @param tableName 表名
+     * @return 字段名列表
+     */
+    List<String> getDataSourceColumns(String datasourceId, String tableName);
 }

@@ -59,6 +59,37 @@ public class TaskController {
     }
 
     /**
+     * 保存DAG（只保存，不执行）
+     */
+    @PostMapping("/save")
+    public ApiResponse<TaskCreateResponse> saveDag(@RequestBody TaskRequest request,
+                                                     @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        String taskId = taskScheduler.saveDag(request);
+
+        // 记录审计日志
+        auditLogService.log(userId != null ? userId : "system", "SAVE_DAG", "TASK", taskId,
+            Map.of("name", request.getName(), "type", request.getType() != null ? request.getType().name() : "COMPONENT_DAG",
+                   "participants", request.getParticipants() != null ? request.getParticipants().size() : 0), null);
+
+        return ApiResponse.success(new TaskCreateResponse(taskId, TaskStatus.CREATED));
+    }
+
+    /**
+     * 执行已保存的任务
+     */
+    @PostMapping("/{taskId}/execute")
+    public ApiResponse<Boolean> executeTask(@PathVariable(name = "taskId") String taskId,
+                                            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        taskScheduler.executeTask(taskId);
+
+        // 记录审计日志
+        auditLogService.log(userId != null ? userId : "system", "EXECUTE_TASK", "TASK", taskId,
+            Map.of("taskId", taskId), null);
+
+        return ApiResponse.success(true);
+    }
+
+    /**
      * 查询任务详情
      */
     @GetMapping("/{taskId}")

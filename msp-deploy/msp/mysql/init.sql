@@ -1,11 +1,20 @@
 -- 密算平台数据库初始化脚本 (MySQL 8.0)
 
+-- 创建 Kuscia 数据库（供 Kuscia Master 使用）
+CREATE DATABASE IF NOT EXISTS kuscia_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 给 msp 用户授权访问 kuscia_db
+GRANT ALL PRIVILEGES ON kuscia_db.* TO 'msp'@'%';
+FLUSH PRIVILEGES;
+
 -- 节点表
 CREATE TABLE IF NOT EXISTS msp_nodes (
     node_id VARCHAR(64) PRIMARY KEY,
     node_name VARCHAR(128) NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'OFFLINE',
+    node_mode VARCHAR(32) NOT NULL DEFAULT 'RAY' COMMENT '节点部署模式: RAY / KUSCIA',
     endpoint VARCHAR(256),
+    external_endpoint VARCHAR(256),
     capabilities TEXT,
     tags TEXT,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -23,6 +32,8 @@ CREATE TABLE IF NOT EXISTS msp_tasks (
     inputs TEXT,
     parameters TEXT,
     description TEXT,
+    code TEXT COMMENT '任务代码/DAG规格',
+    result TEXT COMMENT '任务执行结果',
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -116,7 +127,7 @@ CREATE TABLE IF NOT EXISTS msp_role_permissions (
 
 -- 插入默认管理员用户 (密码: admin123, SHA-256 hash then Base64 encoded)
 INSERT INTO msp_users (user_id, username, password, role, enabled, create_time, update_time)
-VALUES ('admin-default-id', 'admin', 'JAvlGPq9JyTdtvBO6x2llnRI1+gxwIyPqCKAn3THIKk=', 'ADMIN', TRUE, NOW(), NOW())
+VALUES ('admin-default-id', 'admin', 'jZae727K08KaOmKSgOaGzww/XVqGr/PKEgIMkjrcbJI=', 'ADMIN', TRUE, NOW(), NOW())
 ON DUPLICATE KEY UPDATE username = username;
 
 -- 插入默认角色
@@ -158,8 +169,8 @@ ON DUPLICATE KEY UPDATE permission_name = permission_name;
 
 -- 给管理员角色分配所有权限
 INSERT INTO msp_role_permissions (role_id, permission_id, create_time)
-SELECT 'role-admin', permission_id, NOW() FROM msp_permissions
-ON DUPLICATE KEY UPDATE create_time = create_time;
+SELECT 'role-admin', permission_id, NOW() FROM msp_permissions p
+ON DUPLICATE KEY UPDATE create_time = NOW();
 
 -- 创建索引
 CREATE INDEX idx_nodes_status ON msp_nodes(status);
@@ -171,3 +182,20 @@ CREATE INDEX idx_users_username ON msp_users(username);
 CREATE INDEX idx_roles_role_code ON msp_roles(role_code);
 CREATE INDEX idx_permissions_code ON msp_permissions(permission_code);
 CREATE INDEX idx_permissions_parent ON msp_permissions(parent_id);
+
+-- 初始化三个医疗机构节点
+INSERT INTO msp_nodes (node_id, node_name, status, node_mode, endpoint, external_endpoint, capabilities, tags) VALUES
+('node-hospital', '医院', 'ONLINE', 'RAY', 'node-a:50051', 'localhost:50051', 'PSI,FEDERATED_LEARNING,MPC', '医院'),
+('node-research', '医疗研究所', 'ONLINE', 'RAY', 'node-b:50051', 'localhost:50052', 'PSI,FEDERATED_LEARNING,MPC', '医疗研究所'),
+('node-insurance', '保险公司', 'ONLINE', 'RAY', 'node-c:50051', 'localhost:50053', 'PSI,FEDERATED_LEARNING,MPC', '保险公司')
+ON DUPLICATE KEY UPDATE status=VALUES(status), node_mode=VALUES(node_mode);
+
+-- 初始化三个医疗机构数据源（数据源=数据库，包含多张表）
+INSERT INTO msp_datasources (datasource_id, node_id, name, type, host, port, database_name, table_name, columns) VALUES
+-- 医院数据库
+('ds-hosp', 'node-hospital', '医院数据库', 'MYSQL', 'node-a-db', 3306, 'hospital_db', NULL, NULL),
+-- 医疗研究所数据库
+('ds-research', 'node-research', '医疗研究所数据库', 'MYSQL', 'node-b-db', 3306, 'research_db', NULL, NULL),
+-- 保险公司数据库
+('ds-insurance', 'node-insurance', '保险公司数据库', 'MYSQL', 'node-c-db', 3306, 'insurance_db', NULL, NULL)
+ON DUPLICATE KEY UPDATE name=VALUES(name);

@@ -36,7 +36,9 @@ public class NodeController {
         node.setNodeId(request.getNodeId());
         node.setNodeName(request.getNodeName());
         node.setStatus(NodeStatus.ONLINE);
+        node.setNodeMode(request.getNodeMode() != null ? request.getNodeMode() : "RAY");
         node.setEndpoint(request.getEndpoint());
+        node.setExternalEndpoint(request.getExternalEndpoint());
         node.setCapabilities(request.getCapabilities());
         node.setTags(request.getTags());
         node.setCreateTime(now);
@@ -46,7 +48,10 @@ public class NodeController {
 
         // 记录审计日志
         auditLogService.log(userId != null ? userId : "system", "REGISTER_NODE", "NODE", request.getNodeId(),
-            Map.of("nodeName", request.getNodeName(), "endpoint", request.getEndpoint() != null ? request.getEndpoint() : ""), null);
+            Map.of("nodeName", request.getNodeName(),
+                   "nodeMode", node.getNodeMode(),
+                   "endpoint", request.getEndpoint() != null ? request.getEndpoint() : "",
+                   "externalEndpoint", request.getExternalEndpoint() != null ? request.getExternalEndpoint() : ""), null);
 
         return ApiResponse.success(new NodeRegisterResponse(node.getNodeId(), node.getStatus()));
     }
@@ -109,18 +114,24 @@ public class NodeController {
     public static class NodeRegisterRequest {
         private String nodeId;
         private String nodeName;
+        private String nodeMode;  // RAY / KUSCIA
         private Set<DeviceType> capabilities;
         private String endpoint;
+        private String externalEndpoint;
         private List<String> tags;
 
         public String getNodeId() { return nodeId; }
         public void setNodeId(String nodeId) { this.nodeId = nodeId; }
         public String getNodeName() { return nodeName; }
         public void setNodeName(String nodeName) { this.nodeName = nodeName; }
+        public String getNodeMode() { return nodeMode; }
+        public void setNodeMode(String nodeMode) { this.nodeMode = nodeMode; }
         public Set<DeviceType> getCapabilities() { return capabilities; }
         public void setCapabilities(Set<DeviceType> capabilities) { this.capabilities = capabilities; }
         public String getEndpoint() { return endpoint; }
         public void setEndpoint(String endpoint) { this.endpoint = endpoint; }
+        public String getExternalEndpoint() { return externalEndpoint; }
+        public void setExternalEndpoint(String externalEndpoint) { this.externalEndpoint = externalEndpoint; }
         public List<String> getTags() { return tags; }
         public void setTags(List<String> tags) { this.tags = tags; }
     }

@@ -19,6 +19,7 @@ public class TaskRequest {
     private Map<String, List<String>> featureParties;       // 各方特征列: {"party_a": ["col1", "col2"]}
     private String labelColumn;                              // 标签列名
     private String modelType;                               // 模型类型: logistic_regression / secureboost
+    private String nodeMode;                                // 节点模式: ray 或 kuscia
 
     // Getters and Setters
     public String getName() { return name; }
@@ -43,4 +44,6 @@ public class TaskRequest {
     public void setLabelColumn(String labelColumn) { this.labelColumn = labelColumn; }
     public String getModelType() { return modelType; }
     public void setModelType(String modelType) { this.modelType = modelType; }
+    public String getNodeMode() { return nodeMode; }
+    public void setNodeMode(String nodeMode) { this.nodeMode = nodeMode; }
 }

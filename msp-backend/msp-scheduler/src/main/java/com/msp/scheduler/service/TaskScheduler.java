@@ -10,11 +10,24 @@ import java.util.List;
 public interface TaskScheduler {
 
     /**
-     * 提交任务
+     * 提交任务（保存并立即执行）
      * @param request 任务请求
      * @return 任务ID
      */
     String submitTask(TaskRequest request);
+
+    /**
+     * 保存DAG（只保存，不执行）
+     * @param request 任务请求
+     * @return 任务ID
+     */
+    String saveDag(TaskRequest request);
+
+    /**
+     * 执行已保存的任务
+     * @param taskId 任务ID
+     */
+    void executeTask(String taskId);
 
     /**
      * 查询任务状态

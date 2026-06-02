@@ -85,10 +85,13 @@ export interface Task {
   type: TaskType;
   algorithm?: string;
   status: TaskStatus;
+  nodeMode?: string;      // 节点模式: ray 或 kuscia
   participants?: string[];
   inputs?: Record<string, DataSource>;
   parameters?: Record<string, string>;
   description?: string;
+  code?: string;        // 任务代码/DAG规格
+  result?: string;      // 任务执行结果
   createTime: number;
   updateTime: number;
 }
@@ -126,7 +129,9 @@ export interface Node {
   nodeId: string;
   nodeName: string;
   status: NodeStatus;
+  nodeMode?: 'RAY' | 'KUSCIA';
   endpoint?: string;
+  externalEndpoint?: string;
   capabilities?: DeviceType[];
   tags?: string[];
   createTime?: number;
@@ -137,8 +142,10 @@ export interface Node {
 export interface NodeRegisterRequest {
   nodeId: string;
   nodeName: string;
+  nodeMode?: 'RAY' | 'KUSCIA';
   capabilities: DeviceType[];
   endpoint: string;
+  externalEndpoint?: string;
   tags?: string[];
 }
 

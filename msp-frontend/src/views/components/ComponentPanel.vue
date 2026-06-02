@@ -80,7 +80,8 @@ const iconMap: Record<string, any> = {
   trendCharts: 'TrendCharts',
   tree: 'Tree',
   dataAnalysis: 'DataAnalysis',
-  upload: 'Upload'
+  upload: 'Upload',
+  connection: 'Connection'
 }
 
 const getIcon = (iconName: string) => {

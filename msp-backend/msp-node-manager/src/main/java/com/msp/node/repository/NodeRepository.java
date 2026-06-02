@@ -27,14 +27,25 @@ public class NodeRepository {
 
     public void save(Node node) {
         String sql = """
-            INSERT INTO msp_nodes (node_id, node_name, status, endpoint, capabilities, tags, create_time, update_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO msp_nodes (node_id, node_name, status, node_mode, endpoint, external_endpoint, capabilities, tags, create_time, update_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                node_name = VALUES(node_name),
+                status = VALUES(status),
+                node_mode = VALUES(node_mode),
+                endpoint = VALUES(endpoint),
+                external_endpoint = VALUES(external_endpoint),
+                capabilities = VALUES(capabilities),
+                tags = VALUES(tags),
+                update_time = VALUES(update_time)
             """;
         jdbcTemplate.update(sql,
             node.getNodeId(),
             node.getNodeName(),
             node.getStatus() != null ? node.getStatus().name() : null,
+            node.getNodeMode(),
             node.getEndpoint(),
+            node.getExternalEndpoint(),
             toJson(node.getCapabilities()),
             toJson(node.getTags()),
             node.getCreateTime() != null ? new java.sql.Timestamp(node.getCreateTime()) : null,
@@ -45,13 +56,15 @@ public class NodeRepository {
     public void update(Node node) {
         String sql = """
             UPDATE msp_nodes
-            SET node_name = ?, status = ?, endpoint = ?, capabilities = ?, tags = ?, update_time = ?
+            SET node_name = ?, status = ?, node_mode = ?, endpoint = ?, external_endpoint = ?, capabilities = ?, tags = ?, update_time = ?
             WHERE node_id = ?
             """;
         jdbcTemplate.update(sql,
             node.getNodeName(),
             node.getStatus() != null ? node.getStatus().name() : null,
+            node.getNodeMode(),
             node.getEndpoint(),
+            node.getExternalEndpoint(),
             toJson(node.getCapabilities()),
             toJson(node.getTags()),
             new java.sql.Timestamp(System.currentTimeMillis()),
@@ -134,7 +147,9 @@ public class NodeRepository {
             node.setNodeId(rs.getString("node_id"));
             node.setNodeName(rs.getString("node_name"));
             node.setStatus(parseEnum(NodeStatus.class, rs.getString("status")));
+            node.setNodeMode(rs.getString("node_mode"));
             node.setEndpoint(rs.getString("endpoint"));
+            node.setExternalEndpoint(rs.getString("external_endpoint"));
             node.setCapabilities(parseSet(rs.getString("capabilities")));
             node.setTags(parseStringList(rs.getString("tags")));
 

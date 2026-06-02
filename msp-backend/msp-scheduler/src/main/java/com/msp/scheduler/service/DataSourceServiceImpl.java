@@ -224,6 +224,54 @@ public class DataSourceServiceImpl implements DataSourceService {
         }
     }
 
+    @Override
+    public List<String> getDataSourceTables(String datasourceId) {
+        DataSource ds = dataSourceRepository.findById(datasourceId)
+            .orElseThrow(() -> new MspException(ErrorCode.DATA_SOURCE_ERROR, "DataSource not found: " + datasourceId));
+
+        try {
+            String url = String.format("jdbc:mysql://%s:%d/%s?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai",
+                ds.getHost(), ds.getPort() != null ? ds.getPort() : 3306, ds.getDatabase());
+            String dbUser = "msp";
+            String dbPass = "msp123456";
+
+            try (Connection conn = DriverManager.getConnection(url, dbUser, dbPass)) {
+                var rs = conn.getMetaData().getTables(ds.getDatabase(), null, null, new String[]{"TABLE"});
+                java.util.List<String> tables = new java.util.ArrayList<>();
+                while (rs.next()) {
+                    tables.add(rs.getString("TABLE_NAME"));
+                }
+                return tables;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("获取表名失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public List<String> getDataSourceColumns(String datasourceId, String tableName) {
+        DataSource ds = dataSourceRepository.findById(datasourceId)
+            .orElseThrow(() -> new MspException(ErrorCode.DATA_SOURCE_ERROR, "DataSource not found: " + datasourceId));
+
+        try {
+            String url = String.format("jdbc:mysql://%s:%d/%s?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai",
+                ds.getHost(), ds.getPort() != null ? ds.getPort() : 3306, ds.getDatabase());
+            String dbUser = "msp";
+            String dbPass = "msp123456";
+
+            try (Connection conn = DriverManager.getConnection(url, dbUser, dbPass)) {
+                var rs = conn.getMetaData().getColumns(ds.getDatabase(), null, tableName, null);
+                java.util.List<String> columns = new java.util.ArrayList<>();
+                while (rs.next()) {
+                    columns.add(rs.getString("COLUMN_NAME"));
+                }
+                return columns;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("获取字段失败: " + e.getMessage(), e);
+        }
+    }
+
     private boolean testMySQLConnection(DataSource ds) {
         String url = String.format("jdbc:mysql://%s:%d/%s",
             ds.getHost(), ds.getPort() != null ? ds.getPort() : 3306, ds.getDatabase());

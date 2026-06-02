@@ -26,8 +26,8 @@ public class TaskRepository {
 
     public void save(Task task) {
         String sql = """
-            INSERT INTO msp_tasks (task_id, name, type, algorithm, status, participants, inputs, parameters, description, create_time, update_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO msp_tasks (task_id, name, type, algorithm, status, participants, inputs, parameters, description, code, result, create_time, update_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
         jdbcTemplate.update(sql,
             task.getTaskId(),
@@ -39,6 +39,8 @@ public class TaskRepository {
             toJson(task.getInputs()),
             toJson(task.getParameters()),
             task.getDescription(),
+            task.getCode(),
+            task.getResult(),
             task.getCreateTime() != null ? new java.sql.Timestamp(task.getCreateTime()) : null,
             task.getUpdateTime() != null ? new java.sql.Timestamp(task.getUpdateTime()) : null
         );
@@ -47,7 +49,7 @@ public class TaskRepository {
     public void update(Task task) {
         String sql = """
             UPDATE msp_tasks
-            SET name = ?, type = ?, algorithm = ?, status = ?, participants = ?, inputs = ?, parameters = ?, description = ?, update_time = ?
+            SET name = ?, type = ?, algorithm = ?, status = ?, participants = ?, inputs = ?, parameters = ?, description = ?, code = ?, result = ?, update_time = ?
             WHERE task_id = ?
             """;
         jdbcTemplate.update(sql,
@@ -59,6 +61,8 @@ public class TaskRepository {
             toJson(task.getInputs()),
             toJson(task.getParameters()),
             task.getDescription(),
+            task.getCode(),
+            task.getResult(),
             new java.sql.Timestamp(System.currentTimeMillis()),
             task.getTaskId()
         );
@@ -107,6 +111,16 @@ public class TaskRepository {
         jdbcTemplate.update(sql, taskId);
     }
 
+    public void updateResult(String taskId, String result) {
+        String sql = "UPDATE msp_tasks SET result = ?, update_time = ? WHERE task_id = ?";
+        jdbcTemplate.update(sql, result, new java.sql.Timestamp(System.currentTimeMillis()), taskId);
+    }
+
+    public void updateCode(String taskId, String code) {
+        String sql = "UPDATE msp_tasks SET code = ?, update_time = ? WHERE task_id = ?";
+        jdbcTemplate.update(sql, code, new java.sql.Timestamp(System.currentTimeMillis()), taskId);
+    }
+
     /**
      * 查询活跃任务（用于状态轮询）
      * @param limit 返回数量限制
@@ -120,6 +134,23 @@ public class TaskRepository {
             LIMIT ?
             """;
         return jdbcTemplate.query(sql, new TaskRowMapper(objectMapper), limit);
+    }
+
+    /**
+     * 查询需要恢复的任务（超时或失败的任务）
+     * @param timeoutMs 超时时间（毫秒）
+     * @return 需要恢复的任务列表
+     */
+    public List<Task> findTasksNeedingRecovery(long timeoutMs) {
+        String sql = """
+            SELECT * FROM msp_tasks
+            WHERE status IN ('FAILED', 'RUNNING', 'PENDING')
+            AND update_time < ?
+            ORDER BY update_time ASC
+            LIMIT 50
+            """;
+        long cutoffTime = System.currentTimeMillis() - timeoutMs;
+        return jdbcTemplate.query(sql, new TaskRowMapper(objectMapper), new java.sql.Timestamp(cutoffTime));
     }
 
     private Object[] buildParams(TaskStatus status, TaskType type, int size, int offset) {
@@ -174,6 +205,8 @@ public class TaskRepository {
             task.setInputs(parseDataSourceMap(rs.getString("inputs")));
             task.setParameters(parseParametersMap(rs.getString("parameters")));
             task.setDescription(rs.getString("description"));
+            task.setCode(rs.getString("code"));
+            task.setResult(rs.getString("result"));
 
             java.sql.Timestamp createTime = rs.getTimestamp("create_time");
             task.setCreateTime(createTime != null ? createTime.getTime() : null);

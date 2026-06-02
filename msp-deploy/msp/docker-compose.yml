@@ -4,6 +4,7 @@ services:
   # MySQL 数据库（主库，存储MSP元数据）
   mysql:
     image: mysql:8
+    container_name: msp-mysql
     environment:
       MYSQL_DATABASE: msp_db
       MYSQL_USER: msp
@@ -15,55 +16,68 @@ services:
       - mysql_data:/var/lib/mysql
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - msp-network
 
-  # Kuscia Master (K8s编排)
+  # Kuscia Master (K8s编排) - 可选，不使用时可删除
   kuscia-master:
     image: secretflow/kuscia:latest
-    command: ["sh", "-c", "mkdir -p /home/kuscia/data/etc/config && kuscia init --mode master -d kuscia-master -e 'mysql://msp:msp123456@tcp(mysql:3306)/kuscia_db?charset=utf8mb4&parseTime=True&loc=Local' > /home/kuscia/data/etc/config/kuscia.yaml && kuscia start -c /home/kuscia/data/etc/config/kuscia.yaml"]
+    container_name: kuscia-master
+    command: ["sh", "-c", "rm -rf /home/kuscia/data/* 2>/dev/null; mkdir -p /home/kuscia/data/etc/config && kuscia init --mode master -d kuscia-master -e 'mysql://msp:msp123456@tcp(msp-mysql:3306)/kuscia_db?charset=utf8mb4&parseTime=True&loc=Local' -p NOTLS > /home/kuscia/data/etc/config/kuscia.yaml && kuscia start -c /home/kuscia/data/etc/config/kuscia.yaml"]
     ports:
       - "8080:8080"
       - "8081:8081"
+      - "8083:8083"
     volumes:
       - kuscia_data:/home/kuscia/data
     depends_on:
       - mysql
     environment:
       - KUSCIA_API_ADDRESS=0.0.0.0:8083
+      - KUSCIA_MASTER_IP=kuscia-master
+    networks:
+      - msp-network
+    # Kuscia可选，不启动时NODE_MODE=ray生效
 
   # 调度服务
   scheduler:
     build:
       context: ../../msp-backend
       dockerfile: msp-scheduler/Dockerfile
+    container_name: msp-scheduler
     ports:
       - "18081:8081"
     depends_on:
       - mysql
-      - kuscia-master
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&collationConnection=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=msp
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-msp123456}
       - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
-      - KUSCIA_API_ADDRESS=kuscia-master:8083
+    networks:
+      - msp-network
 
   # API网关
   gateway:
     build:
       context: ../../msp-backend
       dockerfile: msp-gateway/Dockerfile
+    container_name: msp-gateway
     ports:
-      - "8090:8090"
+      - "8092:8090"
     depends_on:
       - scheduler
     environment:
       - SPRING_CLOUD_GATEWAY_ROUTES_SCHEDULER_URI=http://scheduler:8081
+    networks:
+      - msp-network
 
   # 节点管理服务
   node-manager:
     build:
       context: ../../msp-backend
       dockerfile: msp-node-manager/Dockerfile
+    container_name: msp-node-manager
     ports:
       - "8082:8082"
     depends_on:
@@ -73,22 +87,28 @@ services:
       - SPRING_DATASOURCE_USERNAME=msp
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-msp123456}
       - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+    networks:
+      - msp-network
 
   # 前端
   frontend:
     build:
       context: ../../msp-frontend
       dockerfile: Dockerfile
+    container_name: msp-frontend
     ports:
       - "3000:3000"
     depends_on:
       - gateway
+    networks:
+      - msp-network
 
   # ==========================================
-  # 模拟节点 A（参与方A）
+  # 参与方A节点 (Ray Head + 可选Kuscia Agent合并)
   # ==========================================
   node-a-db:
     image: mysql:8
+    container_name: node-a-db
     environment:
       MYSQL_ROOT_PASSWORD: nodea123
       MYSQL_DATABASE: node_a_data
@@ -102,29 +122,41 @@ services:
 
   node-a:
     build:
-      context: ../../msp-node
+      context: ./node-a
       dockerfile: Dockerfile
+    container_name: node-a
     ports:
       - "50051:50051"
+      - "6379:6379"
     depends_on:
       - node-a-db
     environment:
-      - NODE_ID=node-a
-      - NODE_NAME=参与方A
+      - NODE_ID=node-hospital
+      - NODE_NAME=医院
+      - NODE_MODE=RAY
       - DB_HOST=node-a-db
       - DB_PORT=3306
       - DB_USER=root
       - DB_PASSWORD=nodea123
       - DB_NAME=node_a_data
       - GRPC_PORT=50051
+      - SECRETFLOW_MODE=true
+      # Ray集群模式配置
+      - RAY_HEAD=true
+      # Ray Head节点地址（供Worker连接）
+      - RAY_HEAD_ADDRESS=node-a:6379
+      # Kuscia配置（nodeMode=kuscia时使用）
+      - KUSCIA_MASTER=http://kuscia-master:8080
+      - KUSCIA_NODE_TOKEN=KgHPmGpqvIIkSBgblsHHgbWif9yTB3Gd
     networks:
       - msp-network
 
   # ==========================================
-  # 模拟节点 B（参与方B）
+  # 参与方B节点 (Ray Worker + 可选Kuscia Agent合并)
   # ==========================================
   node-b-db:
     image: mysql:8
+    container_name: node-b-db
     environment:
       MYSQL_ROOT_PASSWORD: nodeb123
       MYSQL_DATABASE: node_b_data
@@ -138,29 +170,39 @@ services:
 
   node-b:
     build:
-      context: ../../msp-node
+      context: ./node-b
       dockerfile: Dockerfile
+    container_name: node-b
     ports:
       - "50052:50051"
     depends_on:
       - node-b-db
     environment:
-      - NODE_ID=node-b
-      - NODE_NAME=参与方B
+      - NODE_ID=node-research
+      - NODE_NAME=医疗研究所
+      - NODE_MODE=RAY
       - DB_HOST=node-b-db
       - DB_PORT=3306
       - DB_USER=root
       - DB_PASSWORD=nodeb123
       - DB_NAME=node_b_data
       - GRPC_PORT=50051
+      - SECRETFLOW_MODE=true
+      # Ray集群模式配置
+      - RAY_HEAD=false
+      - RAY_HEAD_ADDRESS=node-a:6379
+      # Kuscia配置（nodeMode=kuscia时使用）
+      - KUSCIA_MASTER=http://kuscia-master:8080
+      - KUSCIA_NODE_TOKEN=23AJ85a5hrv33XAtvXsYSBiBGrVskqYB
     networks:
       - msp-network
 
   # ==========================================
-  # 模拟节点 C（用于PSI等三方场景）
+  # 参与方C节点（Ray Worker，用于PSI等三方场景）
   # ==========================================
   node-c-db:
     image: mysql:8
+    container_name: node-c-db
     environment:
       MYSQL_ROOT_PASSWORD: nodec123
       MYSQL_DATABASE: node_c_data
@@ -176,19 +218,25 @@ services:
     build:
       context: ../../msp-node
       dockerfile: Dockerfile
+    container_name: node-c
     ports:
       - "50053:50051"
     depends_on:
       - node-c-db
     environment:
-      - NODE_ID=node-c
-      - NODE_NAME=参与方C
+      - NODE_ID=node-insurance
+      - NODE_NAME=保险公司
+      - NODE_MODE=RAY
       - DB_HOST=node-c-db
       - DB_PORT=3306
       - DB_USER=root
       - DB_PASSWORD=nodec123
       - DB_NAME=node_c_data
       - GRPC_PORT=50051
+      - SECRETFLOW_MODE=true
+      # Ray集群模式配置
+      - RAY_HEAD=false
+      - RAY_HEAD_ADDRESS=node-a:6379
     networks:
       - msp-network
 

@@ -12,6 +12,8 @@ import RoleListView from '@/views/RoleListView.vue'
 import PermissionTreeView from '@/views/PermissionTreeView.vue'
 import SystemConfigView from '@/views/SystemConfigView.vue'
 import DashboardView from '@/views/DashboardView.vue'
+import AlertConfigView from '@/views/AlertConfigView.vue'
+import MonitoringView from '@/views/MonitoringView.vue'
 import { useAuthStore } from '@/stores/auth'
 
 // 路由元数据接口
@@ -117,6 +119,18 @@ const routes = [
     name: 'SystemConfig',
     component: SystemConfigView,
     meta: { requiresAuth: true, roles: ['ADMIN'] }
+  },
+  {
+    path: '/alerts',
+    name: 'AlertConfig',
+    component: AlertConfigView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/monitoring',
+    name: 'Monitoring',
+    component: MonitoringView,
+    meta: { requiresAuth: true }
   }
 ]
 

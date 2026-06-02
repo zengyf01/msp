@@ -9,5 +9,6 @@ public enum DeviceType {
     HEU,   // 同态加密单元
     TEEU,  // 可信执行环境单元
     PSI,   // 隐私集合求交
-    MPC    // 安全多方计算
+    MPC,   // 安全多方计算
+    FEDERATED_LEARNING  // 联邦学习
 }

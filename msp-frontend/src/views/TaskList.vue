@@ -20,10 +20,10 @@
         :row-style="{ cursor: 'pointer' }"
         @row-click="(row) => viewTask(row.taskId)"
       >
-        <el-table-column prop="name" label="任务名称" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="type" label="类型" width="100">
+        <el-table-column prop="name" label="任务名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="type" label="任务类型" width="120">
           <template #default="{ row }">
-            <el-tag size="small" effect="plain">{{ row.type }}</el-tag>
+            <el-tag size="small" effect="plain">{{ getTaskTypeLabel(row.type) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
@@ -33,15 +33,29 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" min-width="160">
+        <el-table-column prop="participants" label="参与方" min-width="120">
+          <template #default="{ row }">
+            {{ row.participants?.join(', ') || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="createTime" label="创建时间" min-width="150">
           <template #default="{ row }">
             <span class="time-text">{{ formatTime(row.createTime) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" min-width="120">
           <template #default="{ row }">
             <div @click.stop>
               <el-button size="small" text type="primary" @click="viewTask(row.taskId)">详情</el-button>
+              <el-button
+                size="small"
+                text
+                type="success"
+                @click="handleExecute(row.taskId)"
+                v-if="row.status === 'CREATED'"
+              >
+                执行
+              </el-button>
               <el-button
                 size="small"
                 text
@@ -115,8 +129,19 @@ const handleCancel = async (taskId: string) => {
   try {
     await taskStore.cancelTask(taskId)
     ElMessage.success('任务已取消')
+    loadTasks()
   } catch (error) {
     ElMessage.error('取消失败')
+  }
+}
+
+const handleExecute = async (taskId: string) => {
+  try {
+    await taskStore.executeTask(taskId)
+    ElMessage.success('任务已开始执行')
+    loadTasks()
+  } catch (error) {
+    ElMessage.error('执行失败')
   }
 }
 
@@ -147,6 +172,19 @@ const getStatusLabel = (status: TaskStatus) => {
     CANCELLED: '已取消'
   }
   return labels[status] || status
+}
+
+const getTaskTypeLabel = (type: string) => {
+  const labels: Record<string, string> = {
+    PSI: '隐私集合求交',
+    MPC: '安全多方计算',
+    FEDERATED_LEARNING: '联邦学习',
+    CUSTOM_CODE: '自定义代码',
+    VERTICAL_FL: '纵向联邦学习',
+    COMPOUND_TASK: '复合任务',
+    COMPONENT_DAG: 'DAG任务'
+  }
+  return labels[type] || type
 }
 
 const handleDelete = async (taskId: string) => {

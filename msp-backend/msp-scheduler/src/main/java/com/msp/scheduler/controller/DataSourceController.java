@@ -116,6 +116,26 @@ public class DataSourceController {
     }
 
     /**
+     * 获取数据源的所有表名
+     */
+    @GetMapping("/{datasourceId}/tables")
+    public ApiResponse<List<String>> getDataSourceTables(@PathVariable(name = "datasourceId") String datasourceId) {
+        List<String> tables = dataSourceService.getDataSourceTables(datasourceId);
+        return ApiResponse.success(tables);
+    }
+
+    /**
+     * 获取数据源的表字段信息
+     */
+    @GetMapping("/{datasourceId}/columns")
+    public ApiResponse<List<String>> getDataSourceColumns(
+            @PathVariable(name = "datasourceId") String datasourceId,
+            @RequestParam(name = "tableName") String tableName) {
+        List<String> columns = dataSourceService.getDataSourceColumns(datasourceId, tableName);
+        return ApiResponse.success(columns);
+    }
+
+    /**
      * 创建模拟节点（演示用）
      */
     @PostMapping("/simulate")

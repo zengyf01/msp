@@ -27,7 +27,7 @@
       <el-table-column prop="database" label="数据库" width="150" />
       <el-table-column label="操作" width="200">
         <template #default="{ row }">
-          <el-button size="small" @click="viewDataSource(row)">查看</el-button>
+          <el-button size="small" @click="viewDataSource(row.dataSourceId)">查看</el-button>
           <el-tooltip v-if="row.isSimulated" content="模拟数据源不支持删除" placement="left">
             <el-button size="small" type="info" disabled>删除</el-button>
           </el-tooltip>
@@ -57,7 +57,7 @@
         </template>
         <template #default>
           主机名: <code>{{ selectedDataSource.host }}</code><br/>
-          外部访问: <code>localhost:{{ selectedDataSource.port }}</code>
+          外部访问: <code>localhost:{{ selectedDataSource.externalPort || selectedDataSource.port }}</code>
         </template>
       </el-alert>
     </el-dialog>
@@ -90,52 +90,11 @@ const detailDialogVisible = ref(false)
 const selectedDataSource = ref<any>(null)
 
 const dataSources = computed(() => {
-  // 合并真实数据源和模拟数据源
-  const realDataSources = dataSourceStore.dataSources.map(ds => ({ ...ds, isSimulated: false }))
-  return [...simulatedDataSources.value, ...realDataSources]
+  // 只使用从数据库读取的真实数据源
+  return dataSourceStore.dataSources || []
 })
 const loading = computed(() => dataSourceStore.loading)
 const total = computed(() => dataSourceStore.total)
-
-// 模拟数据源列表（对应Docker Compose的模拟节点数据库）
-const simulatedDataSources = ref([
-  {
-    dataSourceId: 'sim-node-a',
-    name: '数据中心A数据库',
-    type: 'MYSQL',
-    nodeId: 'node-a',
-    host: 'node-a-db',
-    port: 3306,
-    database: 'node_a_data',
-    tableName: 'data_a',
-    columnName: 'id_card',
-    isSimulated: true
-  },
-  {
-    dataSourceId: 'sim-node-b',
-    name: '数据中心B数据库',
-    type: 'MYSQL',
-    nodeId: 'node-b',
-    host: 'node-b-db',
-    port: 3306,
-    database: 'node_b_data',
-    tableName: 'data_b',
-    columnName: 'mobile',
-    isSimulated: true
-  },
-  {
-    dataSourceId: 'sim-node-c',
-    name: '数据中心C数据库',
-    type: 'MYSQL',
-    nodeId: 'node-c',
-    host: 'node-c-db',
-    port: 3306,
-    database: 'node_c_data',
-    tableName: 'data_c',
-    columnName: 'mobile',
-    isSimulated: true
-  }
-])
 
 onMounted(() => {
   loadDataSources()
@@ -154,14 +113,7 @@ const loadDataSources = async () => {
 }
 
 const viewDataSource = (datasourceId: string) => {
-  // 模拟数据源显示详情对话框
-  const sim = simulatedDataSources.value.find(ds => ds.dataSourceId === datasourceId)
-  if (sim) {
-    selectedDataSource.value = sim
-    detailDialogVisible.value = true
-    return
-  }
-  // 真实数据源跳转编辑页面
+  // 跳转编辑页面
   router.push(`/datasources/${datasourceId}`)
 }
 

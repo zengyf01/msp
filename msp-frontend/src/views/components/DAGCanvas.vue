@@ -33,7 +33,7 @@
               :data-node-id="node.nodeId"
               :data-port-type="input.type || 'input'"
               :data-port-index="idx"
-              @mouseup="onPortMouseUp(node, 'input', idx)"
+              @dblclick="onPortDoubleClick(node, 'input', idx)"
             ></div>
           </div>
         </div>
@@ -47,7 +47,7 @@
               :data-node-id="node.nodeId"
               :data-port-type="output.type || 'output'"
               :data-port-index="idx"
-              @mousedown="onPortMouseDown(node, 'output', idx)"
+              @dblclick="onPortDoubleClick(node, 'output', idx)"
             ></div>
           </div>
         </div>
@@ -55,7 +55,7 @@
     </div>
 
     <!-- 边 -->
-    <svg class="edges-svg">
+    <svg class="edges-svg" ref="svgRef">
       <defs>
         <marker
           id="arrowhead"
@@ -75,12 +75,6 @@
         class="dag-edge"
         marker-end="url(#arrowhead)"
         @click.stop="onEdgeClick(edge)"
-      />
-      <!-- 正在绘制的边 -->
-      <path
-        v-if="drawingEdge"
-        :d="getTempEdgePath()"
-        class="dag-edge drawing"
       />
     </svg>
 
@@ -127,21 +121,38 @@ const emit = defineEmits<{
 }>()
 
 const canvasRef = ref<HTMLElement | null>(null)
+const svgRef = ref<SVGSVGElement | null>(null)
 const selectedNodeId = ref<string | null>(null)
 
 // 节点拖拽
 const draggingNode = ref<DAGNode | null>(null)
 const dragOffset = ref({ x: 0, y: 0 })
 
-// 边绘制
-const drawingEdge = ref<{
-  fromNode: string
-  fromPort: number
-  mouseX: number
-  mouseY: number
-} | null>(null)
+// 双击连线状态
+const selectedOutputPort = ref<{ nodeId: string; portIndex: number } | null>(null)
 
-const tempMousePos = ref({ x: 0, y: 0 })
+// 自动布局计数器
+const nodeCounter = ref({ row: 0, col: 0 })
+const NODE_WIDTH = 180
+const NODE_HEIGHT = 100
+const GRID_COLS = 4
+const GRID_SPACING_X = 220
+const GRID_SPACING_Y = 140
+
+// 获取下一个节点位置（网格布局）
+const getNextNodePosition = () => {
+  const rect = canvasRef.value?.getBoundingClientRect()
+  if (!rect) return { x: 100, y: 100 }
+
+  const col = nodeCounter.value.col % GRID_COLS
+  const row = Math.floor(nodeCounter.value.col / GRID_COLS)
+
+  const x = 50 + col * GRID_SPACING_X
+  const y = 50 + row * GRID_SPACING_Y
+
+  nodeCounter.value.col++
+  return { x, y }
+}
 
 // 获取边路径
 const getEdgePath = (edge: Edge) => {
@@ -154,22 +165,6 @@ const getEdgePath = (edge: Edge) => {
   const fromY = fromNode.y + 50
   const toX = toNode.x
   const toY = toNode.y + 50
-
-  const midX = (fromX + toX) / 2
-
-  return `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`
-}
-
-const getTempEdgePath = () => {
-  if (!drawingEdge.value) return ''
-
-  const fromNode = props.nodes.find(n => n.nodeId === drawingEdge.value!.fromNode)
-  if (!fromNode) return ''
-
-  const fromX = fromNode.x + 150
-  const fromY = fromNode.y + 50
-  const toX = tempMousePos.value.x
-  const toY = tempMousePos.value.y
 
   const midX = (fromX + toX) / 2
 
@@ -192,6 +187,9 @@ const onDeleteNode = (nodeId: string) => {
 }
 
 const onNodeMouseDown = (node: DAGNode, event: MouseEvent) => {
+  // Stop propagation to prevent triggering edge drawing
+  event.stopPropagation()
+
   draggingNode.value = node
   dragOffset.value = {
     x: event.clientX - node.x,
@@ -212,44 +210,25 @@ const onMouseMove = (event: MouseEvent) => {
 
     emit('node-update', { ...draggingNode.value })
   }
-
-  if (drawingEdge.value) {
-    const rect = canvasRef.value?.getBoundingClientRect()
-    if (rect) {
-      tempMousePos.value = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top
-      }
-    }
-  }
 }
 
-const onMouseUp = () => {
+const onMouseUp = (event: MouseEvent) => {
   draggingNode.value = null
   document.removeEventListener('mousemove', onMouseMove)
   document.removeEventListener('mouseup', onMouseUp)
 }
 
-const onPortMouseDown = (node: DAGNode, portType: string, portIndex: number) => {
+// 双击端口进行连线
+const onPortDoubleClick = (node: DAGNode, portType: string, portIndex: number) => {
   if (portType === 'output') {
-    drawingEdge.value = {
-      fromNode: node.nodeId,
-      fromPort: portIndex,
-      mouseX: node.x + 150,
-      mouseY: node.y + 50
-    }
-
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
-  }
-}
-
-const onPortMouseUp = (node: DAGNode, portType: string, portIndex: number) => {
-  if (drawingEdge.value && portType === 'input') {
+    // 选择输出端口
+    selectedOutputPort.value = { nodeId: node.nodeId, portIndex }
+  } else if (portType === 'input' && selectedOutputPort.value) {
+    // 选择输入端口，创建连线
     const edge: Edge = {
-      from: drawingEdge.value.fromNode,
+      from: selectedOutputPort.value.nodeId,
       to: node.nodeId,
-      fromPort: drawingEdge.value.fromPort,
+      fromPort: selectedOutputPort.value.portIndex,
       toPort: portIndex
     }
 
@@ -261,11 +240,10 @@ const onPortMouseUp = (node: DAGNode, portType: string, portIndex: number) => {
     if (!exists) {
       emit('edge-add', edge)
     }
-  }
 
-  drawingEdge.value = null
-  document.removeEventListener('mousemove', onMouseMove)
-  document.removeEventListener('mouseup', onMouseUp)
+    // 清除选择状态
+    selectedOutputPort.value = null
+  }
 }
 
 const onDrop = (event: DragEvent) => {
@@ -275,22 +253,22 @@ const onDrop = (event: DragEvent) => {
   if (!data) return
 
   const component = JSON.parse(data)
-  const rect = canvasRef.value?.getBoundingClientRect()
 
-  if (rect) {
-    const newNode: DAGNode = {
-      nodeId: `node_${Date.now()}`,
-      compId: component.id,
-      label: component.label,
-      x: event.clientX - rect.left - 75,
-      y: event.clientY - rect.top - 40,
-      attrs: {},
-      inputs: [{ name: 'data', type: 'input' }],
-      outputs: [{ name: 'data', type: 'output' }]
-    }
+  // 使用网格自动布局
+  const pos = getNextNodePosition()
 
-    emit('node-update', newNode)
+  const newNode: DAGNode = {
+    nodeId: `node_${Date.now()}`,
+    compId: component.id,
+    label: component.label,
+    x: pos.x,
+    y: pos.y,
+    attrs: {},
+    inputs: [{ name: 'data', type: 'input' }],
+    outputs: [{ name: 'data', type: 'output' }]
   }
+
+  emit('node-update', newNode)
 }
 
 const onDragOver = (event: DragEvent) => {

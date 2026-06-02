@@ -44,6 +44,12 @@ export const taskAPI = {
   createTask: (data: TaskRequest) =>
     api.post<{ data: { taskId: string; status: string } }>('/tasks', data),
 
+  saveDag: (data: TaskRequest) =>
+    api.post<{ data: { taskId: string; status: string } }>('/tasks/save', data),
+
+  executeTask: (taskId: string) =>
+    api.post<{ data: boolean }>(`/tasks/${taskId}/execute`),
+
   getTask: (taskId: string) =>
     api.get<{ data: Task }>(`/tasks/${taskId}`),
 
@@ -61,6 +67,9 @@ export const taskAPI = {
 
   cancelTask: (taskId: string) =>
     api.delete<{ data: boolean }>(`/tasks/${taskId}/cancel`),
+
+  stopTask: (taskId: string) =>
+    api.post<{ data: boolean }>(`/tasks/${taskId}/stop`),
 }
 
 // 节点相关API
@@ -91,6 +100,12 @@ export const dataSourceAPI = {
 
   getDataSource: (datasourceId: string) =>
     api.get<{ data: DataSource }>(`/datasources/${datasourceId}`),
+
+  getDataSourceTables: (datasourceId: string) =>
+    api.get<{ data: string[] }>(`/datasources/${datasourceId}/tables`),
+
+  getDataSourceColumns: (datasourceId: string, tableName: string) =>
+    api.get<{ data: string[] }>(`/datasources/${datasourceId}/columns`, { params: { tableName } }),
 
   updateDataSource: (datasourceId: string, data: DataSourceRequest) =>
     api.put<{ data: boolean }>(`/datasources/${datasourceId}`, data),
@@ -247,6 +262,24 @@ export const systemConfigAPI = {
 
   getAllConfigs: () =>
     api.get<{ data: any }>('/system-config')
+}
+
+// 告警相关API
+export const alertAPI = {
+  getAlertHistory: (params?: { limit?: number }) =>
+    api.get<{ data: any[] }>('/alerts', { params }),
+
+  getAlert: (alertId: string) =>
+    api.get<{ data: any }>(`/alerts/${alertId}`),
+
+  resolveAlert: (alertId: string) =>
+    api.post<{ data: boolean }>(`/alerts/${alertId}/resolve`),
+
+  clearResolvedAlerts: () =>
+    api.delete<{ data: boolean }>('/alerts/resolved'),
+
+  getAlertStats: () =>
+    api.get<{ data: any }>('/alerts/stats'),
 }
 
 export default api
