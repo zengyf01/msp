@@ -1,8 +1,10 @@
 package com.msp.scheduler.controller;
 
 import com.msp.common.core.ApiResponse;
+import com.msp.common.core.ColumnInfo;
 import com.msp.common.core.DataSource;
 import com.msp.common.core.Page;
+import com.msp.common.core.TableInfo;
 import com.msp.scheduler.service.DataSourceService;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,6 +35,8 @@ public class DataSourceController {
         ds.setHost(request.getHost());
         ds.setPort(request.getPort());
         ds.setDatabase(request.getDatabase());
+        ds.setUsername(request.getUsername());
+        ds.setPassword(request.getPassword());
         ds.setTableName(request.getTableName());
         ds.setColumns(request.getColumns());
 
@@ -75,6 +79,8 @@ public class DataSourceController {
         ds.setHost(request.getHost());
         ds.setPort(request.getPort());
         ds.setDatabase(request.getDatabase());
+        ds.setUsername(request.getUsername());
+        ds.setPassword(request.getPassword());
         ds.setTableName(request.getTableName());
         ds.setColumns(request.getColumns());
 
@@ -116,34 +122,31 @@ public class DataSourceController {
     }
 
     /**
-     * 创建模拟节点（演示用）
+     * 获取数据源的所有表（含表名 + 表注释，从 INFORMATION_SCHEMA 实时读取）
      */
-    @PostMapping("/simulate")
-    public ApiResponse<Boolean> createSimulatedNode(@RequestBody SimulateNodeRequest request) {
-        boolean success = dataSourceService.createSimulatedNode(
-            request.getNodeId(),
-            request.getDbName(),
-            request.getTableName(),
-            request.getColumnName()
-        );
-        return ApiResponse.success(success);
+    @GetMapping("/{datasourceId}/tables")
+    public ApiResponse<List<TableInfo>> getDataSourceTables(@PathVariable(name = "datasourceId") String datasourceId) {
+        List<TableInfo> tables = dataSourceService.getDataSourceTables(datasourceId);
+        return ApiResponse.success(tables);
     }
 
     /**
-     * 删除模拟节点（演示用）
+     * 获取数据源的表字段信息（含字段名 + 字段注释，从 INFORMATION_SCHEMA 实时读取）
      */
-    @DeleteMapping("/simulate/{nodeId}")
-    public ApiResponse<Boolean> deleteSimulatedNode(@PathVariable(name = "nodeId") String nodeId) {
-        boolean success = dataSourceService.deleteSimulatedNode(nodeId);
-        return ApiResponse.success(success);
+    @GetMapping("/{datasourceId}/columns")
+    public ApiResponse<List<ColumnInfo>> getDataSourceColumns(
+            @PathVariable(name = "datasourceId") String datasourceId,
+            @RequestParam(name = "tableName") String tableName) {
+        List<ColumnInfo> columns = dataSourceService.getDataSourceColumns(datasourceId, tableName);
+        return ApiResponse.success(columns);
     }
 
     /**
-     * 获取模拟节点示例数据
+     * 获取示例数据
      */
-    @PostMapping("/simulate/sample-data")
-    public ApiResponse<List<List<Object>>> getSimulatedNodeSampleData(@RequestBody SampleDataRequest request) {
-        List<List<Object>> data = dataSourceService.getSimulatedNodeSampleData(
+    @PostMapping("/sample-data")
+    public ApiResponse<List<List<Object>>> getSampleData(@RequestBody SampleDataRequest request) {
+        List<List<Object>> data = dataSourceService.getSampleData(
             request.getDbName(),
             request.getTableName()
         );
@@ -158,6 +161,8 @@ public class DataSourceController {
         private String host;
         private Integer port;
         private String database;
+        private String username;
+        private String password;
         private String tableName;
         private List<String> columns;
 
@@ -173,26 +178,14 @@ public class DataSourceController {
         public void setPort(Integer port) { this.port = port; }
         public String getDatabase() { return database; }
         public void setDatabase(String database) { this.database = database; }
+        public String getUsername() { return username; }
+        public void setUsername(String username) { this.username = username; }
+        public String getPassword() { return password; }
+        public void setPassword(String password) { this.password = password; }
         public String getTableName() { return tableName; }
         public void setTableName(String tableName) { this.tableName = tableName; }
         public List<String> getColumns() { return columns; }
         public void setColumns(List<String> columns) { this.columns = columns; }
-    }
-
-    public static class SimulateNodeRequest {
-        private String nodeId;
-        private String dbName;
-        private String tableName;
-        private String columnName;
-
-        public String getNodeId() { return nodeId; }
-        public void setNodeId(String nodeId) { this.nodeId = nodeId; }
-        public String getDbName() { return dbName; }
-        public void setDbName(String dbName) { this.dbName = dbName; }
-        public String getTableName() { return tableName; }
-        public void setTableName(String tableName) { this.tableName = tableName; }
-        public String getColumnName() { return columnName; }
-        public void setColumnName(String columnName) { this.columnName = columnName; }
     }
 
     public static class DataSourceCreateResponse {

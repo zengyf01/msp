@@ -14,6 +14,12 @@ public class TaskRequest {
     private Map<String, DataSource> inputs;
     private Map<String, String> parameters;
     private String description;
+    // 纵向联邦学习字段
+    private String labelParty;                              // 标签提供方
+    private Map<String, List<String>> featureParties;       // 各方特征列: {"party_a": ["col1", "col2"]}
+    private String labelColumn;                              // 标签列名
+    private String modelType;                               // 模型类型: logistic_regression / secureboost
+    private String nodeMode;                                // 节点模式: ray 或 kuscia
 
     // Getters and Setters
     public String getName() { return name; }
@@ -30,4 +36,14 @@ public class TaskRequest {
     public void setParameters(Map<String, String> parameters) { this.parameters = parameters; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public String getLabelParty() { return labelParty; }
+    public void setLabelParty(String labelParty) { this.labelParty = labelParty; }
+    public Map<String, List<String>> getFeatureParties() { return featureParties; }
+    public void setFeatureParties(Map<String, List<String>> featureParties) { this.featureParties = featureParties; }
+    public String getLabelColumn() { return labelColumn; }
+    public void setLabelColumn(String labelColumn) { this.labelColumn = labelColumn; }
+    public String getModelType() { return modelType; }
+    public void setModelType(String modelType) { this.modelType = modelType; }
+    public String getNodeMode() { return nodeMode; }
+    public void setNodeMode(String nodeMode) { this.nodeMode = nodeMode; }
 }

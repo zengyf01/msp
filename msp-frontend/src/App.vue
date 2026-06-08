@@ -46,6 +46,14 @@
               <el-icon><Document /></el-icon>
               <span>审计日志</span>
             </el-menu-item>
+            <el-menu-item index="/alerts">
+              <el-icon><Bell /></el-icon>
+              <span>告警配置</span>
+            </el-menu-item>
+            <el-menu-item index="/monitoring">
+              <el-icon><Monitor /></el-icon>
+              <span>实时监控</span>
+            </el-menu-item>
 
             <el-sub-menu index="system" v-if="authStore.isAdmin">
               <template #title>
@@ -92,7 +100,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import {
-  HomeFilled, List, Link, Collection, Document, Setting, SwitchButton, Grid
+  HomeFilled, List, Link, Collection, Document, Setting, SwitchButton, Grid, Bell, Monitor
 } from '@element-plus/icons-vue'
 
 const route = useRoute()

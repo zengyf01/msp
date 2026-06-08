@@ -1,10 +1,9 @@
-FROM eclipse-temurin:17-jdk-alpine AS builder
-
-RUN apk add --no-cache maven
+FROM maven:3.9-eclipse-temurin-17 AS builder
 
 WORKDIR /app
 
 COPY pom.xml .
+COPY maven-settings.xml /root/.m2/settings.xml
 COPY msp-common/pom.xml msp-common/
 COPY msp-kuscia/pom.xml msp-kuscia/
 COPY msp-scheduler/pom.xml msp-scheduler/
@@ -22,7 +21,7 @@ COPY msp-starter/src msp-starter/src
 RUN mvn install -DskipTests -pl msp-common -am && \
     mvn package -DskipTests -pl msp-gateway -am
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 

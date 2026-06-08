@@ -12,7 +12,10 @@ export enum TaskStatus {
 export enum TaskType {
   PSI = 'PSI',
   MPC = 'MPC',
-  FEDERATED_LEARNING = 'FEDERATED_LEARNING'
+  FEDERATED_LEARNING = 'FEDERATED_LEARNING',
+  CUSTOM_CODE = 'CUSTOM_CODE',
+  VERTICAL_FL = 'VERTICAL_FL',
+  COMPOUND_TASK = 'COMPOUND_TASK'
 }
 
 // 节点状态
@@ -48,6 +51,8 @@ export interface DataSource {
   host?: string;
   port?: number;
   database?: string;
+  username?: string;
+  password?: string;
   tableName?: string;
   columns?: string[];
 }
@@ -60,6 +65,8 @@ export interface DataSourceRequest {
   host?: string;
   port?: number;
   database?: string;
+  username?: string;
+  password?: string;
   tableName?: string;
   columns?: string[];
 }
@@ -67,6 +74,18 @@ export interface DataSourceRequest {
 // 数据源创建响应
 export interface DataSourceCreateResponse {
   datasourceId: string;
+}
+
+// 数据库表信息（name + 来自 INFORMATION_SCHEMA.TABLES.TABLE_COMMENT 的中文注释）
+export interface TableInfo {
+  name: string;
+  comment: string;
+}
+
+// 数据库字段信息（name + 来自 INFORMATION_SCHEMA.COLUMNS.COLUMN_COMMENT 的中文注释）
+export interface ColumnInfo {
+  name: string;
+  comment: string;
 }
 
 // 连接测试响应
@@ -82,12 +101,22 @@ export interface Task {
   type: TaskType;
   algorithm?: string;
   status: TaskStatus;
+  nodeMode?: string;      // 节点模式: ray 或 kuscia
   participants?: string[];
   inputs?: Record<string, DataSource>;
   parameters?: Record<string, string>;
   description?: string;
+  code?: string;        // 任务代码/DAG规格
+  result?: string;      // 任务执行结果
   createTime: number;
   updateTime: number;
+}
+
+// MPC计算类型
+export enum MpcType {
+  ADDITION = 'addition',
+  MULTIPLICATION = 'multiplication',
+  COMPARISON = 'comparison'
 }
 
 // 任务请求
@@ -99,6 +128,16 @@ export interface TaskRequest {
   inputs?: Record<string, DataSource>;
   parameters?: Record<string, string>;
   description?: string;
+  mpcType?: MpcType;
+  // 纵向联邦学习字段
+  labelParty?: string;
+  labelColumn?: string;
+  modelType?: 'logistic_regression' | 'secureboost';
+  featureParties?: Record<string, string[]>;
+  numTrees?: number;
+  maxDepth?: number;
+  // PSI 协议
+  psiProtocol?: 'ecdh' | 'kkrt' | 'bc22' | 'unbalanced';
 }
 
 // 节点
@@ -106,7 +145,9 @@ export interface Node {
   nodeId: string;
   nodeName: string;
   status: NodeStatus;
+  nodeMode?: 'RAY' | 'KUSCIA';
   endpoint?: string;
+  externalEndpoint?: string;
   capabilities?: DeviceType[];
   tags?: string[];
   createTime?: number;
@@ -117,8 +158,10 @@ export interface Node {
 export interface NodeRegisterRequest {
   nodeId: string;
   nodeName: string;
+  nodeMode?: 'RAY' | 'KUSCIA';
   capabilities: DeviceType[];
   endpoint: string;
+  externalEndpoint?: string;
   tags?: string[];
 }
 
@@ -157,6 +200,17 @@ export interface TaskResultResponse {
   taskId: string;
   status: TaskStatus;
   result?: any;
+}
+
+// 任务执行过程响应（含实际执行日志和 DAG 定义）
+export interface TaskExecutionResponse {
+  taskId: string;
+  status: TaskStatus;
+  nodeMode?: string;
+  // 数组字符串，结构：[{ts, stage, level, message, nodeId?, role?, dagNodeId?, compId?, label?, durationMs?}, ...]
+  executionLog: string;
+  // DAG 定义的 JSON 字符串
+  dagDefinition?: string;
 }
 
 // 节点注册响应

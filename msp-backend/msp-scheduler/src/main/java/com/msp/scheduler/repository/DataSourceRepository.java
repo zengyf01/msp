@@ -3,6 +3,8 @@ package com.msp.scheduler.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.msp.common.core.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -16,6 +18,8 @@ import java.util.Optional;
 @Repository
 public class DataSourceRepository {
 
+    private static final Logger log = LoggerFactory.getLogger(DataSourceRepository.class);
+
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
@@ -26,9 +30,10 @@ public class DataSourceRepository {
 
     public void save(DataSource dataSource) {
         String sql = """
-            INSERT INTO msp_datasources (datasource_id, node_id, name, type, host, port, database_name, table_name, columns, create_time, update_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO msp_datasources (datasource_id, node_id, name, type, host, port, database_name, username, password, table_name, columns, create_time, update_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
+        log.info("[SQL] INSERT | table=msp_datasources | datasource_id={}", dataSource.getDataSourceId());
         long now = System.currentTimeMillis();
         jdbcTemplate.update(sql,
             dataSource.getDataSourceId(),
@@ -38,6 +43,8 @@ public class DataSourceRepository {
             dataSource.getHost(),
             dataSource.getPort(),
             dataSource.getDatabase(),
+            dataSource.getUsername(),
+            dataSource.getPassword(),
             dataSource.getTableName(),
             toJson(dataSource.getColumns()),
             new java.sql.Timestamp(now),
@@ -48,9 +55,10 @@ public class DataSourceRepository {
     public void update(DataSource dataSource) {
         String sql = """
             UPDATE msp_datasources
-            SET node_id = ?, name = ?, type = ?, host = ?, port = ?, database_name = ?, table_name = ?, columns = ?, update_time = ?
+            SET node_id = ?, name = ?, type = ?, host = ?, port = ?, database_name = ?, username = ?, password = ?, table_name = ?, columns = ?, update_time = ?
             WHERE datasource_id = ?
             """;
+        log.info("[SQL] UPDATE | table=msp_datasources | datasource_id={}", dataSource.getDataSourceId());
         jdbcTemplate.update(sql,
             dataSource.getNodeId(),
             dataSource.getName(),
@@ -58,6 +66,8 @@ public class DataSourceRepository {
             dataSource.getHost(),
             dataSource.getPort(),
             dataSource.getDatabase(),
+            dataSource.getUsername(),
+            dataSource.getPassword(),
             dataSource.getTableName(),
             toJson(dataSource.getColumns()),
             new java.sql.Timestamp(System.currentTimeMillis()),
@@ -67,12 +77,14 @@ public class DataSourceRepository {
 
     public Optional<DataSource> findById(String datasourceId) {
         String sql = "SELECT * FROM msp_datasources WHERE datasource_id = ?";
+        log.info("[SQL] SELECT | table=msp_datasources | WHERE datasource_id={}", datasourceId);
         List<DataSource> results = jdbcTemplate.query(sql, new DataSourceRowMapper(objectMapper), datasourceId);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
     public List<DataSource> findByNodeId(String nodeId) {
         String sql = "SELECT * FROM msp_datasources WHERE node_id = ? ORDER BY create_time DESC";
+        log.info("[SQL] SELECT | table=msp_datasources | WHERE node_id={}", nodeId);
         return jdbcTemplate.query(sql, new DataSourceRowMapper(objectMapper), nodeId);
     }
 
@@ -116,6 +128,7 @@ public class DataSourceRepository {
 
     public void delete(String datasourceId) {
         String sql = "DELETE FROM msp_datasources WHERE datasource_id = ?";
+        log.info("[SQL] DELETE | table=msp_datasources | WHERE datasource_id={}", datasourceId);
         jdbcTemplate.update(sql, datasourceId);
     }
 
@@ -145,6 +158,8 @@ public class DataSourceRepository {
             ds.setHost(rs.getString("host"));
             ds.setPort(rs.getObject("port") != null ? rs.getInt("port") : null);
             ds.setDatabase(rs.getString("database_name"));
+            ds.setUsername(rs.getString("username"));
+            ds.setPassword(rs.getString("password"));
             ds.setTableName(rs.getString("table_name"));
             ds.setColumns(parseStringList(rs.getString("columns")));
 

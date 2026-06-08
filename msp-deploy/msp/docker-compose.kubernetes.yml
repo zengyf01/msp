@@ -1,0 +1,370 @@
+version: '3.8'
+
+# ============================================================
+# MSP Kubernetes 部署模式
+# ============================================================
+#
+# 【特点】
+#   - 使用 Kuscia 进行任务编排
+#   - 适用于生产环境或 K8s 集群
+#   - SPU 通信使用 Kuscia/SFU 内部机制
+#
+# 【前置条件】
+#   - Docker Compose with --profile support
+#   - 或直接部署到 K8s 集群
+#
+# 【bRPC 支持】
+#   ✅ 完全支持 - Kuscia 编排下 bRPC 通过内部网络通信
+#
+# 【启动方式】
+#   docker-compose -f docker-compose.kubernetes.yml up -d
+#   或
+#   docker-compose --profile kubernetes up -d
+#
+# 【核心组件】
+#   - kuscia-master: K8s 编排核心，管理节点和任务
+#   - 各节点使用 NODE_MODE=KUSCIA 接入 Kuscia
+#
+# 【Kuscia Token 配置】
+#   各节点的 KUSCIA_NODE_TOKEN 需要与 Kuscia Master 注册时的 token 一致
+#   当前配置使用预设 token，正式环境请使用安全的 token 生成方式
+#
+# 【与桥接模式差异】
+#   - 使用 bridge 网络而非 host 网络
+#   -节点间通过服务名通信 (node-a, node-b, node-c)
+#   - SPU 端口映射: node-a:8000, node-b:8001, node-c:8002
+# ============================================================
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: msp-mysql
+    environment:
+      MYSQL_DATABASE: msp_db
+      MYSQL_USER: msp
+      MYSQL_PASSWORD: ${DB_PASSWORD:-msp123456}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root123456}
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    ports:
+      - "13306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    networks:
+      - msp-network
+
+  # Kuscia Master - K8s 编排核心
+  kuscia-master:
+    image: secretflow/kuscia:latest
+    container_name: kuscia-master
+    command: ["sh", "-c", "rm -rf /home/kuscia/data/* 2>/dev/null; mkdir -p /home/kuscia/data/etc/config && kuscia init --mode master -d kuscia-master -e 'mysql://msp:msp123456@tcp(msp-mysql:3306)/kuscia_db?charset=utf8mb4&parseTime=True&loc=Local' -p NOTLS > /home/kuscia/data/etc/config/kuscia.yaml && kuscia start -c /home/kuscia/data/etc/config/kuscia.yaml"]
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "8083:8083"
+    volumes:
+      - kuscia_data:/home/kuscia/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - KUSCIA_API_ADDRESS=0.0.0.0:8083
+      - KUSCIA_MASTER_IP=kuscia-master
+    networks:
+      - msp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/api/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  scheduler:
+    build:
+      context: ../../msp-backend
+      dockerfile: msp-scheduler/Dockerfile
+    image: docker-scheduler:latest
+    container_name: msp-scheduler
+    ports:
+      - "18081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kuscia-master:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&collationConnection=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=msp
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-msp123456}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+    networks:
+      - msp-network
+
+  gateway:
+    build:
+      context: ../../msp-backend
+      dockerfile: msp-gateway/Dockerfile
+    image: docker-gateway:latest
+    container_name: msp-gateway
+    ports:
+      - "8092:8090"
+    depends_on:
+      - scheduler
+    environment:
+      - SPRING_CLOUD_GATEWAY_ROUTES_SCHEDULER_URI=http://scheduler:8081
+    networks:
+      - msp-network
+
+  node-manager:
+    build:
+      context: ../../msp-backend
+      dockerfile: msp-node-manager/Dockerfile
+    image: docker-node-manager:latest
+    container_name: msp-node-manager
+    ports:
+      - "8082:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&collationConnection=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=msp
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-msp123456}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+    networks:
+      - msp-network
+
+  frontend:
+    build:
+      context: ../../msp-frontend
+      dockerfile: Dockerfile
+    image: docker-frontend:latest
+    container_name: msp-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+    networks:
+      - msp-network
+
+  # ==========================================
+  # K8s 模式下参与方节点 (使用 Kuscia 编排)
+  # ==========================================
+  node-a-db:
+    image: mysql:8
+    container_name: node-a-db
+    environment:
+      MYSQL_ROOT_PASSWORD: nodea123
+      MYSQL_DATABASE: node_a_data
+    ports:
+      - "3307:3306"
+    volumes:
+      - node_a_data:/var/lib/mysql
+      - ./node-a-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - msp-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pnodea123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  node-a:
+    build:
+      context: ../../msp-node
+      dockerfile: Dockerfile
+    image: docker-node-a:latest
+    container_name: node-a
+    ports:
+      - "50051:50051"
+      - "50052:50052"
+    depends_on:
+      node-a-db:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      kuscia-master:
+        condition: service_healthy
+    environment:
+      - DEPLOY_MODE=kubernetes
+      - NODE_ID=node-hospital
+      - NODE_NAME=医院
+      # K8s 模式使用 Kuscia 编排
+      - NODE_MODE=KUSCIA
+      - SELF_PARTY=node-hospital
+      - PARTIES=node-hospital,node-research,node-insurance
+      - RAY_HEAD_PARTY=node-hospital
+      - PSI_RECEIVER=node-hospital
+      - PSI_KEY_COLUMN=id
+      - DB_HOST=node-a-db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=nodea123
+      - DB_NAME=node_a_data
+      - GRPC_PORT=50051
+      - HTTP_PORT=50052
+      - SECRETFLOW_MODE=true
+      - HEARTBEAT_INTERVAL=10
+      - RAY_HEAD=true
+      - RAY_HEAD_ADDRESS=kuscia-master:6379
+      - RAY_HEAD_PORT=6379
+      # Kuscia 配置 - K8s 模式下必需
+      - KUSCIA_MASTER=http://kuscia-master:8080
+      - KUSCIA_NODE_TOKEN=KgHPmGpqvIIkSBgblsHHgbWif9yTB3Gd
+      # MSP数据库连接
+      - MSP_DB_HOST=mysql
+      - MSP_DB_PORT=3306
+      - MSP_DB_USER=msp
+      - MSP_DB_PASSWORD=${DB_PASSWORD:-msp123456}
+      - MSP_DB_NAME=msp_db
+    networks:
+      - msp-network
+
+  node-b-db:
+    image: mysql:8
+    container_name: node-b-db
+    environment:
+      MYSQL_ROOT_PASSWORD: nodeb123
+      MYSQL_DATABASE: node_b_data
+    ports:
+      - "3308:3306"
+    volumes:
+      - node_b_data:/var/lib/mysql
+      - ./node-b-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - msp-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pnodeb123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  node-b:
+    build:
+      context: ../../msp-node
+      dockerfile: Dockerfile
+    image: docker-node-b:latest
+    container_name: node-b
+    ports:
+      - "50053:50053"
+    depends_on:
+      node-b-db:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      kuscia-master:
+        condition: service_healthy
+    environment:
+      - DEPLOY_MODE=kubernetes
+      - NODE_ID=node-research
+      - NODE_NAME=医疗研究所
+      - NODE_MODE=KUSCIA
+      - SELF_PARTY=node-research
+      - PARTIES=node-hospital,node-research,node-insurance
+      - RAY_HEAD_PARTY=node-hospital
+      - PSI_RECEIVER=node-hospital
+      - PSI_KEY_COLUMN=id
+      - DB_HOST=node-b-db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=nodeb123
+      - DB_NAME=node_b_data
+      - GRPC_PORT=50051
+      - HTTP_PORT=50053
+      - SECRETFLOW_MODE=true
+      - HEARTBEAT_INTERVAL=10
+      - RAY_HEAD=false
+      - RAY_HEAD_ADDRESS=kuscia-master:6379
+      - RAY_HEAD_PORT=6379
+      - KUSCIA_MASTER=http://kuscia-master:8080
+      - KUSCIA_NODE_TOKEN=23AJ85a5hrv33XAtvXsYSBiBGrVskqYB
+      - MSP_DB_HOST=mysql
+      - MSP_DB_PORT=3306
+      - MSP_DB_USER=msp
+      - MSP_DB_PASSWORD=${DB_PASSWORD:-msp123456}
+      - MSP_DB_NAME=msp_db
+    networks:
+      - msp-network
+
+  node-c-db:
+    image: mysql:8
+    container_name: node-c-db
+    environment:
+      MYSQL_ROOT_PASSWORD: nodec123
+      MYSQL_DATABASE: node_c_data
+    ports:
+      - "3310:3306"
+    volumes:
+      - node_c_data:/var/lib/mysql
+      - ./node-c-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - msp-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pnodec123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  node-c:
+    build:
+      context: ../../msp-node
+      dockerfile: Dockerfile
+    image: docker-node-c:latest
+    container_name: node-c
+    ports:
+      - "50054:50054"
+    depends_on:
+      node-c-db:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      kuscia-master:
+        condition: service_healthy
+    environment:
+      - DEPLOY_MODE=kubernetes
+      - NODE_ID=node-insurance
+      - NODE_NAME=保险公司
+      - NODE_MODE=KUSCIA
+      - SELF_PARTY=node-insurance
+      - PARTIES=node-hospital,node-research,node-insurance
+      - RAY_HEAD_PARTY=node-hospital
+      - PSI_RECEIVER=node-hospital
+      - PSI_KEY_COLUMN=id
+      - DB_HOST=node-c-db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=nodec123
+      - DB_NAME=node_c_data
+      - GRPC_PORT=50051
+      - HTTP_PORT=50054
+      - SECRETFLOW_MODE=true
+      - HEARTBEAT_INTERVAL=10
+      - RAY_HEAD=false
+      - RAY_HEAD_ADDRESS=kuscia-master:6379
+      - RAY_HEAD_PORT=6379
+      - KUSCIA_MASTER=http://kuscia-master:8080
+      - KUSCIA_NODE_TOKEN=some-token
+      - MSP_DB_HOST=mysql
+      - MSP_DB_PORT=3306
+      - MSP_DB_USER=msp
+      - MSP_DB_PASSWORD=${DB_PASSWORD:-msp123456}
+      - MSP_DB_NAME=msp_db
+    networks:
+      - msp-network
+
+networks:
+  msp-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  kuscia_data:
+  node_a_data:
+  node_b_data:
+  node_c_data:

@@ -15,7 +15,7 @@
               <el-input v-model="platformConfig.platformName" placeholder="密算平台" />
             </el-form-item>
             <el-form-item label="平台描述">
-              <el-input v-model="platformConfig.description" type="textarea" :rows="3" placeholder="隐私计算平台描述" />
+              <el-input v-model="platformConfig.platformDescription" type="textarea" :rows="3" placeholder="隐私计算平台描述" />
             </el-form-item>
             <el-form-item label="技术支持邮箱">
               <el-input v-model="platformConfig.supportEmail" placeholder="support@example.com" />
@@ -24,7 +24,7 @@
               <el-input v-model="platformConfig.contactPhone" placeholder="400-xxx-xxxx" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="savePlatformConfig">保存</el-button>
+              <el-button type="primary" @click="savePlatformConfig" :loading="saving">保存</el-button>
             </el-form-item>
           </el-form>
         </el-tab-pane>
@@ -51,7 +51,7 @@
               <el-input-number v-model="securityConfig.maxLoginAttempts" :min="3" :max="10" :disabled="!securityConfig.loginFailLock" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="saveSecurityConfig">保存</el-button>
+              <el-button type="primary" @click="saveSecurityConfig" :loading="saving">保存</el-button>
             </el-form-item>
           </el-form>
         </el-tab-pane>
@@ -98,7 +98,7 @@
             </el-form-item>
 
             <el-form-item>
-              <el-button type="primary" @click="saveComputingConfig">保存</el-button>
+              <el-button type="primary" @click="saveComputingConfig" :loading="saving">保存</el-button>
             </el-form-item>
           </el-form>
         </el-tab-pane>
@@ -126,7 +126,7 @@
               <el-input v-model="notificationConfig.webhookUrl" placeholder="https://..." />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="saveNotificationConfig">保存</el-button>
+              <el-button type="primary" @click="saveNotificationConfig" :loading="saving">保存</el-button>
             </el-form-item>
           </el-form>
         </el-tab-pane>
@@ -138,13 +138,16 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { systemConfigAPI } from '@/api'
 
 const activeTab = ref('platform')
+const saving = ref(false)
+const loading = ref(false)
 
 // 平台配置
 const platformConfig = reactive({
   platformName: '密算平台',
-  description: '可信数据空间的隐私计算平台',
+  platformDescription: '可信数据空间的隐私计算平台',
   supportEmail: 'support@msp.com',
   contactPhone: '400-123-4567'
 })
@@ -180,64 +183,95 @@ const notificationConfig = reactive({
 })
 
 onMounted(() => {
-  loadConfig()
+  loadConfigs()
 })
 
-const loadConfig = async () => {
-  // 实际应从API加载配置
-  // 模拟加载本地存储的配置
-  const saved = localStorage.getItem('msp_system_config')
-  if (saved) {
-    try {
-      const config = JSON.parse(saved)
-      Object.assign(platformConfig, config.platform || {})
-      Object.assign(securityConfig, config.security || {})
-      Object.assign(computingConfig, config.computing || {})
-      Object.assign(notificationConfig, config.notification || {})
-    } catch (e) {
-      // ignore
+const loadConfigs = async () => {
+  loading.value = true
+  try {
+    const [platformRes, securityRes, computingRes, notificationRes] = await Promise.all([
+      systemConfigAPI.getPlatformConfig(),
+      systemConfigAPI.getSecurityConfig(),
+      systemConfigAPI.getComputingConfig(),
+      systemConfigAPI.getNotificationConfig()
+    ])
+
+    if (platformRes.data?.data) {
+      Object.assign(platformConfig, platformRes.data.data)
     }
+    if (securityRes.data?.data) {
+      Object.assign(securityConfig, securityRes.data.data)
+    }
+    if (computingRes.data?.data) {
+      Object.assign(computingConfig, computingRes.data.data)
+    }
+    if (notificationRes.data?.data) {
+      const notifyData = notificationRes.data.data
+      // 处理notifyChannels可能是逗号分隔字符串
+      if (notifyData.notifyChannels && typeof notifyData.notifyChannels === 'string') {
+        notifyData.notifyChannels = notifyData.notifyChannels.split(',')
+      }
+      Object.assign(notificationConfig, notifyData)
+    }
+  } catch (error: any) {
+    console.error('Failed to load configs:', error)
+    ElMessage.warning('加载配置失败，使用默认配置')
+  } finally {
+    loading.value = false
   }
 }
 
 const savePlatformConfig = async () => {
-  localStorage.setItem('msp_system_config', JSON.stringify({
-    platform: platformConfig,
-    security: securityConfig,
-    computing: computingConfig,
-    notification: notificationConfig
-  }))
-  ElMessage.success('平台配置已保存')
+  saving.value = true
+  try {
+    await systemConfigAPI.updatePlatformConfig(platformConfig)
+    ElMessage.success('平台配置已保存')
+  } catch (error: any) {
+    ElMessage.error(error.message || '保存失败')
+  } finally {
+    saving.value = false
+  }
 }
 
 const saveSecurityConfig = async () => {
-  localStorage.setItem('msp_system_config', JSON.stringify({
-    platform: platformConfig,
-    security: securityConfig,
-    computing: computingConfig,
-    notification: notificationConfig
-  }))
-  ElMessage.success('安全配置已保存')
+  saving.value = true
+  try {
+    await systemConfigAPI.updateSecurityConfig(securityConfig)
+    ElMessage.success('安全配置已保存')
+  } catch (error: any) {
+    ElMessage.error(error.message || '保存失败')
+  } finally {
+    saving.value = false
+  }
 }
 
 const saveComputingConfig = async () => {
-  localStorage.setItem('msp_system_config', JSON.stringify({
-    platform: platformConfig,
-    security: securityConfig,
-    computing: computingConfig,
-    notification: notificationConfig
-  }))
-  ElMessage.success('计算配置已保存')
+  saving.value = true
+  try {
+    await systemConfigAPI.updateComputingConfig(computingConfig)
+    ElMessage.success('计算配置已保存')
+  } catch (error: any) {
+    ElMessage.error(error.message || '保存失败')
+  } finally {
+    saving.value = false
+  }
 }
 
 const saveNotificationConfig = async () => {
-  localStorage.setItem('msp_system_config', JSON.stringify({
-    platform: platformConfig,
-    security: securityConfig,
-    computing: computingConfig,
-    notification: notificationConfig
-  }))
-  ElMessage.success('通知配置已保存')
+  saving.value = true
+  try {
+    // 转换notifyChannels为逗号分隔字符串
+    const data = {
+      ...notificationConfig,
+      notifyChannels: notificationConfig.notifyChannels.join(',')
+    }
+    await systemConfigAPI.updateNotificationConfig(data)
+    ElMessage.success('通知配置已保存')
+  } catch (error: any) {
+    ElMessage.error(error.message || '保存失败')
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 

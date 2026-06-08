@@ -1,6 +1,6 @@
 """
 MPC运行器
-基于SecretFlow SPU实现真实的安全多方计算
+基于SecretFlow SPU实现安全多方计算
 """
 
 from typing import Dict, Any

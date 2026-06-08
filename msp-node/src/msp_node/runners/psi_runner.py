@@ -1,6 +1,6 @@
 """
 PSI运行器
-基于SecretFlow SPU实现真实的隐私集合求交
+基于SecretFlow SPU实现隐私集合求交
 """
 
 from typing import Dict, Any
