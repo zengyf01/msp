@@ -3,6 +3,8 @@ package com.msp.scheduler.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.msp.common.core.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -16,6 +18,8 @@ import java.util.Optional;
 @Repository
 public class TaskRepository {
 
+    private static final Logger log = LoggerFactory.getLogger(TaskRepository.class);
+
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
@@ -25,20 +29,29 @@ public class TaskRepository {
     }
 
     public void save(Task task) {
+        // 如果任务已存在（幂等），直接返回，避免重复创建
+        if (findById(task.getTaskId()).isPresent()) {
+            return;
+        }
         String sql = """
-            INSERT INTO msp_tasks (task_id, name, type, algorithm, status, participants, inputs, parameters, description, create_time, update_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO msp_tasks (task_id, name, type, algorithm, status, node_mode, participants, inputs, parameters, description, code, result, execution_log, create_time, update_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
+        log.info("[SQL] INSERT | table=msp_tasks | task_id={}", task.getTaskId());
         jdbcTemplate.update(sql,
             task.getTaskId(),
             task.getName(),
             task.getType() != null ? task.getType().name() : null,
             task.getAlgorithm(),
             task.getStatus() != null ? task.getStatus().name() : null,
+            task.getNodeMode(),
             toJson(task.getParticipants()),
             toJson(task.getInputs()),
             toJson(task.getParameters()),
             task.getDescription(),
+            task.getCode(),
+            task.getResult(),
+            task.getExecutionLog(),
             task.getCreateTime() != null ? new java.sql.Timestamp(task.getCreateTime()) : null,
             task.getUpdateTime() != null ? new java.sql.Timestamp(task.getUpdateTime()) : null
         );
@@ -47,18 +60,23 @@ public class TaskRepository {
     public void update(Task task) {
         String sql = """
             UPDATE msp_tasks
-            SET name = ?, type = ?, algorithm = ?, status = ?, participants = ?, inputs = ?, parameters = ?, description = ?, update_time = ?
+            SET name = ?, type = ?, algorithm = ?, status = ?, node_mode = ?, participants = ?, inputs = ?, parameters = ?, description = ?, code = ?, result = ?, execution_log = ?, update_time = ?
             WHERE task_id = ?
             """;
+        log.info("[SQL] UPDATE | table=msp_tasks | task_id={}", task.getTaskId());
         jdbcTemplate.update(sql,
             task.getName(),
             task.getType() != null ? task.getType().name() : null,
             task.getAlgorithm(),
             task.getStatus() != null ? task.getStatus().name() : null,
+            task.getNodeMode(),
             toJson(task.getParticipants()),
             toJson(task.getInputs()),
             toJson(task.getParameters()),
             task.getDescription(),
+            task.getCode(),
+            task.getResult(),
+            task.getExecutionLog(),
             new java.sql.Timestamp(System.currentTimeMillis()),
             task.getTaskId()
         );
@@ -66,6 +84,7 @@ public class TaskRepository {
 
     public Optional<Task> findById(String taskId) {
         String sql = "SELECT * FROM msp_tasks WHERE task_id = ?";
+        log.info("[SQL] SELECT | table=msp_tasks | WHERE task_id={}", taskId);
         List<Task> results = jdbcTemplate.query(sql, new TaskRowMapper(objectMapper), taskId);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
@@ -99,12 +118,32 @@ public class TaskRepository {
 
     public void updateStatus(String taskId, TaskStatus status) {
         String sql = "UPDATE msp_tasks SET status = ?, update_time = ? WHERE task_id = ?";
+        log.info("[SQL] UPDATE | table=msp_tasks | SET status={} | WHERE task_id={}", status, taskId);
         jdbcTemplate.update(sql, status.name(), new java.sql.Timestamp(System.currentTimeMillis()), taskId);
     }
 
     public void delete(String taskId) {
         String sql = "DELETE FROM msp_tasks WHERE task_id = ?";
+        log.info("[SQL] DELETE | table=msp_tasks | WHERE task_id={}", taskId);
         jdbcTemplate.update(sql, taskId);
+    }
+
+    public void updateResult(String taskId, String result) {
+        String sql = "UPDATE msp_tasks SET result = ?, update_time = ? WHERE task_id = ?";
+        log.info("[SQL] UPDATE | table=msp_tasks | SET result=... | WHERE task_id={}", taskId);
+        jdbcTemplate.update(sql, result, new java.sql.Timestamp(System.currentTimeMillis()), taskId);
+    }
+
+    public void updateExecutionLog(String taskId, String executionLog) {
+        String sql = "UPDATE msp_tasks SET execution_log = ?, update_time = ? WHERE task_id = ?";
+        log.info("[SQL] UPDATE | table=msp_tasks | SET execution_log=... | WHERE task_id={}", taskId);
+        jdbcTemplate.update(sql, executionLog, new java.sql.Timestamp(System.currentTimeMillis()), taskId);
+    }
+
+    public void updateCode(String taskId, String code) {
+        String sql = "UPDATE msp_tasks SET code = ?, update_time = ? WHERE task_id = ?";
+        log.info("[SQL] UPDATE | table=msp_tasks | SET code=... | WHERE task_id={}", taskId);
+        jdbcTemplate.update(sql, code, new java.sql.Timestamp(System.currentTimeMillis()), taskId);
     }
 
     /**
@@ -120,6 +159,23 @@ public class TaskRepository {
             LIMIT ?
             """;
         return jdbcTemplate.query(sql, new TaskRowMapper(objectMapper), limit);
+    }
+
+    /**
+     * 查询需要恢复的任务（超时或失败的任务）
+     * @param timeoutMs 超时时间（毫秒）
+     * @return 需要恢复的任务列表
+     */
+    public List<Task> findTasksNeedingRecovery(long timeoutMs) {
+        String sql = """
+            SELECT * FROM msp_tasks
+            WHERE status IN ('FAILED', 'RUNNING', 'PENDING')
+            AND update_time < ?
+            ORDER BY update_time ASC
+            LIMIT 50
+            """;
+        long cutoffTime = System.currentTimeMillis() - timeoutMs;
+        return jdbcTemplate.query(sql, new TaskRowMapper(objectMapper), new java.sql.Timestamp(cutoffTime));
     }
 
     private Object[] buildParams(TaskStatus status, TaskType type, int size, int offset) {
@@ -170,10 +226,14 @@ public class TaskRepository {
             task.setType(parseEnum(TaskType.class, rs.getString("type")));
             task.setAlgorithm(rs.getString("algorithm"));
             task.setStatus(parseEnum(TaskStatus.class, rs.getString("status")));
+            task.setNodeMode(rs.getString("node_mode"));
             task.setParticipants(parseStringList(rs.getString("participants")));
             task.setInputs(parseDataSourceMap(rs.getString("inputs")));
             task.setParameters(parseParametersMap(rs.getString("parameters")));
             task.setDescription(rs.getString("description"));
+            task.setCode(rs.getString("code"));
+            task.setResult(rs.getString("result"));
+            task.setExecutionLog(rs.getString("execution_log"));
 
             java.sql.Timestamp createTime = rs.getTimestamp("create_time");
             task.setCreateTime(createTime != null ? createTime.getTime() : null);

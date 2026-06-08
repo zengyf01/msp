@@ -16,8 +16,12 @@ public class Task {
     private Map<String, DataSource> inputs;
     private Map<String, String> parameters;
     private String description;
+    private String code;           // 任务代码/DAG规格
+    private String result;        // 任务执行结果
+    private String executionLog;  // 执行过程日志（JSON：分发轨迹 + 节点执行轨迹）
     private Long createTime;
     private Long updateTime;
+    private String nodeMode;      // 节点模式: ray 或 kuscia
 
     public Task() {}
 
@@ -60,4 +64,16 @@ public class Task {
 
     public Long getUpdateTime() { return updateTime; }
     public void setUpdateTime(Long updateTime) { this.updateTime = updateTime; }
+
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
+
+    public String getResult() { return result; }
+    public void setResult(String result) { this.result = result; }
+
+    public String getExecutionLog() { return executionLog; }
+    public void setExecutionLog(String executionLog) { this.executionLog = executionLog; }
+
+    public String getNodeMode() { return nodeMode; }
+    public void setNodeMode(String nodeMode) { this.nodeMode = nodeMode; }
 }

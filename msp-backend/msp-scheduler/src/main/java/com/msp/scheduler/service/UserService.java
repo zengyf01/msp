@@ -101,9 +101,25 @@ public class UserService {
      * 更新用户
      */
     public void updateUser(User user) {
-        if (userRepository.findById(user.getUserId()).isEmpty()) {
+        Optional<User> existingOpt = userRepository.findById(user.getUserId());
+        if (existingOpt.isEmpty()) {
             throw new RuntimeException("用户不存在");
         }
+        User existing = existingOpt.get();
+        existing.setEmail(user.getEmail());
+        existing.setPhone(user.getPhone());
+        existing.setRole(user.getRole());
+        if (user.isEnabled() != existing.isEnabled()) {
+            existing.setEnabled(user.isEnabled());
+        }
+        existing.setUpdateTime(System.currentTimeMillis());
+        userRepository.update(existing);
+    }
+
+    /**
+     * 直接更新用户（不查询现有数据）
+     */
+    public void updateUserDirectly(User user) {
         user.setUpdateTime(System.currentTimeMillis());
         userRepository.update(user);
     }

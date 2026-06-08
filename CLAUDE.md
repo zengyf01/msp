@@ -82,10 +82,81 @@ docker-compose down            # 停止
 - `msp-backend/msp-node-manager/`: 节点管理
 - `msp-node/src/msp_node/runners/`: Python运行器实现
 
-### 镜像构建
-    每次只有有修改代码的任务完成后都需要构建镜像和启动容器
-    每次构建镜像只需要构建有修改的镜像
+## 镜像构建
 
-### docs目录文档
-    每个会话每次问答完成后都需要更新文档
-    相同属性、作用的文档只能有一份
+```bash
+cd msp-deploy/msp
+docker-compose build --parallel # 并行构建所有镜像
+docker-compose up -d                   # 启动所有容器
+docker-compose up -d <service>         # 重启指定服务
+docker-compose logs -f <service>       # 查看日志
+```
+
+## 调试经验
+
+### 任务执行失败排查流程
+
+**原则：追踪到第一个真正的错误，而不是被"跳过"等次要信息带偏**
+
+1. **查看所有 ERROR 级别日志**
+   ```bash
+   docker-compose logs --tail=500 <service> 2>&1 | grep -i "error"
+   ```
+
+2. **检查完整执行链**
+   - 组件状态矛盾时（如 read_table成功 + psi_tp跳过）→ 说明下游组件自己失败，不是上游问题
+   - 不要只看 `INFO` 日志，要追踪 `ERROR` 日志
+
+3. **多节点问题定位**
+   ```bash
+   docker logs node-a 2>&1 | grep -iE "(execute|error|fail)" | tail -50
+   docker logs node-b 2>&1 | grep -iE "(execute|error|fail)" | tail -50
+   docker logs node-c 2>&1 | grep -iE "(execute|error|fail)" | tail -50
+   ```
+
+4. **常见失败原因**
+   - Python模块导入错误：`No module named 'xxx'` → 检查 requirements.txt 和 import 语句
+   - DAG字段名不一致：`attrs` vs `config` → 前端用 `config`，后端可能只读 `attrs`
+   - 数据源owner映射错误：`node-a` vs `node-hospital` → 保持节点ID命名一致
+   - 缺少加密库导入：`PrivateFormat not defined` → 检查 `from xxx import yyy` 语句
+
+5. **验证修复**
+   - 修复后先验证导入/依赖，再重启容器
+   - 单元测试验证：`docker exec node-a python -c "from module import Class; print('OK')"`
+
+## 镜像仓库
+
+私有镜像仓库用于推送 MSP 相关镜像，便于在 K8s 环境部署。
+
+| 配置项 | 值 |
+|--------|-----|
+| 仓库地址 | `r.mayishangshu.cn:82` |
+| 命名空间 | `/msp` |
+| 账号 | `dos` |
+| 密码 | `Test@666` |
+
+### 推送镜像脚本
+
+```bash
+REGISTRY=r.mayishangshu.cn:82/msp
+
+# 构建并推送所有镜像
+cd msp-deploy/msp
+docker-compose -f docker-compose.yml build --parallel
+
+for svc in scheduler gateway node-manager frontend node-a node-b node-c kuscia; do
+    docker tag docker-${svc}:latest ${REGISTRY}/${svc}:latest
+    docker push ${REGISTRY}/${svc}:latest
+done
+```
+
+### 登录镜像仓库
+
+```bash
+docker login r.mayishangshu.cn:82 -u dos -p Test@666
+```
+
+## docs文档
+
+
+

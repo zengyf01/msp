@@ -32,10 +32,9 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="type" label="类型" width="100">
+        <el-table-column prop="nodeMode" label="类型" width="100">
           <template #default="{ row }">
-            <el-tag v-if="row.isSimulated" type="warning" size="small">模拟节点</el-tag>
-            <el-tag v-else type="success" size="small">真实节点</el-tag>
+            <el-tag :type="getNodeModeType(row.nodeMode)" size="small">{{ getNodeModeLabel(row.nodeMode) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="capabilities" label="能力" min-width="180">
@@ -54,15 +53,14 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="endpoint" label="端点" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="endpoint" label="端点" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.externalEndpoint || row.endpoint }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
-            <el-tooltip v-if="row.isSimulated" content="模拟节点不支持注销" placement="left">
-              <el-button size="small" text type="info" disabled>
-                注销
-              </el-button>
-            </el-tooltip>
-            <el-button v-else size="small" text type="danger" @click="handleUnregister(row.nodeId)">
+            <el-button size="small" text type="danger" @click="handleUnregister(row.nodeId)">
               注销
             </el-button>
           </template>
@@ -79,8 +77,17 @@
         <el-form-item label="节点名称" prop="nodeName">
           <el-input v-model="nodeForm.nodeName" placeholder="输入节点名称" />
         </el-form-item>
-        <el-form-item label="端点" prop="endpoint">
-          <el-input v-model="nodeForm.endpoint" placeholder="grpc://host:port" />
+        <el-form-item label="端点(内网)" prop="endpoint">
+          <el-input v-model="nodeForm.endpoint" placeholder="node-a:50051" />
+        </el-form-item>
+        <el-form-item label="端点(外网)" prop="externalEndpoint">
+          <el-input v-model="nodeForm.externalEndpoint" placeholder="localhost:50051" />
+        </el-form-item>
+        <el-form-item label="节点模式" prop="nodeMode">
+          <el-select v-model="nodeForm.nodeMode" placeholder="选择节点部署模式" style="width: 100%">
+            <el-option label="Ray 集群" value="RAY" />
+            <el-option label="Kuscia 编排" value="KUSCIA" />
+          </el-select>
         </el-form-item>
         <el-form-item label="能力" prop="capabilities">
           <el-checkbox-group v-model="nodeForm.capabilities">
@@ -121,7 +128,9 @@ const tagsInput = ref('')
 const nodeForm = reactive({
   nodeId: '',
   nodeName: '',
+  nodeMode: 'RAY' as 'RAY' | 'KUSCIA',
   endpoint: '',
+  externalEndpoint: '',
   capabilities: [] as DeviceType[]
 })
 
@@ -133,39 +142,10 @@ const nodeRules = {
 }
 
 const nodes = computed(() => {
-  // 合并真实节点和模拟节点
-  const realNodes = nodeStore.nodes.map(n => ({ ...n, isSimulated: false }))
-  return [...simulatedNodes.value, ...realNodes]
+  // 只使用从数据库读取的节点
+  return nodeStore.nodes || []
 })
 const loading = computed(() => nodeStore.loading)
-
-// 模拟节点列表（Docker Compose预定义）
-const simulatedNodes = ref([
-  {
-    nodeId: 'node-a',
-    nodeName: '数据中心A',
-    status: 'ONLINE' as const,
-    capabilities: ['PYU', 'SPU'],
-    endpoint: 'grpc://node-a:50051',
-    isSimulated: true
-  },
-  {
-    nodeId: 'node-b',
-    nodeName: '数据中心B',
-    status: 'ONLINE' as const,
-    capabilities: ['PYU', 'SPU'],
-    endpoint: 'grpc://node-b:50051',
-    isSimulated: true
-  },
-  {
-    nodeId: 'node-c',
-    nodeName: '数据中心C',
-    status: 'ONLINE' as const,
-    capabilities: ['PYU', 'SPU'],
-    endpoint: 'grpc://node-c:50051',
-    isSimulated: true
-  }
-])
 
 onMounted(() => {
   loadNodes()
@@ -186,7 +166,9 @@ const showRegisterDialog = () => {
 const resetForm = () => {
   nodeForm.nodeId = ''
   nodeForm.nodeName = ''
+  nodeForm.nodeMode = 'RAY'
   nodeForm.endpoint = ''
+  nodeForm.externalEndpoint = ''
   nodeForm.capabilities = []
   tagsInput.value = ''
 }
@@ -200,7 +182,9 @@ const handleRegister = async () => {
     const request = {
       nodeId: nodeForm.nodeId,
       nodeName: nodeForm.nodeName,
+      nodeMode: nodeForm.nodeMode,
       endpoint: nodeForm.endpoint,
+      externalEndpoint: nodeForm.externalEndpoint,
       capabilities: nodeForm.capabilities,
       tags: tagsInput.value.split(',').map(t => t.trim()).filter(Boolean)
     }
@@ -247,6 +231,26 @@ const getStatusLabel = (status: NodeStatus) => {
     MAINTAIN: '维护'
   }
   return labels[status] || status
+}
+
+const getNodeTypeLabel = (row: any) => {
+  // 根据 capabilities 判断节点类型
+  const caps = row.capabilities || []
+  if (caps.includes('FEDERATED_LEARNING')) return '联邦学习'
+  if (caps.includes('PSI')) return 'PSI'
+  if (caps.includes('MPC')) return 'MPC'
+  return '生产节点'
+}
+
+const getNodeModeLabel = (mode?: string) => {
+  if (mode === 'KUSCIA') return 'KUSCIA'
+  if (mode === 'RAY') return 'Ray'
+  return 'Ray'
+}
+
+const getNodeModeType = (mode?: string) => {
+  if (mode === 'KUSCIA') return 'danger'
+  return 'success'
 }
 </script>
 

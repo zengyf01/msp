@@ -7,6 +7,7 @@ import com.msp.scheduler.service.UserService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 用户管理REST接口
@@ -35,14 +36,25 @@ public class UserController {
 
     @PutMapping("/{userId}")
     public ApiResponse<Boolean> update(@PathVariable(name = "userId") String userId, @RequestBody UserUpdateRequest request) {
-        User user = new User();
-        user.setUserId(userId);
-        user.setEmail(request.getEmail());
-        user.setPhone(request.getPhone());
-        user.setRole(request.getRole());
-        user.setEnabled(request.getEnabled());
-
-        userService.updateUser(user);
+        Optional<User> existingOpt = userService.getUser(userId);
+        if (existingOpt.isEmpty()) {
+            return ApiResponse.error("USER_NOT_FOUND", "用户不存在");
+        }
+        User existing = existingOpt.get();
+        if (request.getEmail() != null) {
+            existing.setEmail(request.getEmail());
+        }
+        if (request.getPhone() != null) {
+            existing.setPhone(request.getPhone());
+        }
+        if (request.getRole() != null) {
+            existing.setRole(request.getRole());
+        }
+        if (request.getEnabled() != null) {
+            existing.setEnabled(request.getEnabled());
+        }
+        existing.setUpdateTime(System.currentTimeMillis());
+        userService.updateUserDirectly(existing);
         return ApiResponse.success(true);
     }
 
@@ -70,12 +82,18 @@ public class UserController {
 
     @PutMapping("/{userId}/password")
     public ApiResponse<Boolean> resetPassword(@PathVariable(name = "userId") String userId, @RequestBody ResetPasswordRequest request) {
+        if (request.getPassword() == null || request.getPassword().isEmpty()) {
+            return ApiResponse.error("INVALID_REQUEST", "密码不能为空");
+        }
         userService.resetPassword(userId, request.getPassword());
         return ApiResponse.success(true);
     }
 
     @PutMapping("/{userId}/status")
     public ApiResponse<Boolean> setEnabled(@PathVariable(name = "userId") String userId, @RequestBody SetEnabledRequest request) {
+        if (request.getEnabled() == null) {
+            return ApiResponse.error("INVALID_REQUEST", "enabled不能为空");
+        }
         userService.setUserEnabled(userId, request.getEnabled());
         return ApiResponse.success(true);
     }

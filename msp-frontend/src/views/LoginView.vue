@@ -84,10 +84,7 @@
           </el-form-item>
         </el-form>
 
-        <div class="login-footer">
-          <span>默认账号: admin / admin123</span>
-        </div>
-      </div>
+              </div>
     </div>
   </div>
 </template>

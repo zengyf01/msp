@@ -201,21 +201,12 @@ const loadStats = async () => {
     updatePieChart()
 
     // 加载节点统计
-    // 合并真实节点和模拟节点
     const nodeRes = await nodeAPI.listNodes({ page: 0, size: 100 })
-    const realNodeList = nodeRes.data?.data?.content || []
+    const nodeList = nodeRes.data?.data?.content || []
 
-    // 模拟节点（总是在线）
-    const simulatedNodeList = [
-      { nodeId: 'node-a', nodeName: '数据中心A', status: 'ONLINE', capabilities: ['PYU', 'SPU'] },
-      { nodeId: 'node-b', nodeName: '数据中心B', status: 'ONLINE', capabilities: ['PYU', 'SPU'] },
-      { nodeId: 'node-c', nodeName: '数据中心C', status: 'ONLINE', capabilities: ['PYU', 'SPU'] }
-    ]
-
-    const allNodes = [...simulatedNodeList, ...realNodeList]
-    nodes.value = allNodes
-    stats.totalNodes = allNodes.length
-    stats.onlineNodes = allNodes.filter((n: any) => n.status === 'ONLINE').length
+    nodes.value = nodeList
+    stats.totalNodes = nodeList.length
+    stats.onlineNodes = nodeList.filter((n: any) => n.status === 'ONLINE').length
   } catch (error) {
     console.error('Failed to load stats:', error)
   }

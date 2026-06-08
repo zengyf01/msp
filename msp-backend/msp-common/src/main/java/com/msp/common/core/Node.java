@@ -10,7 +10,9 @@ public class Node {
     private String nodeId;
     private String nodeName;
     private NodeStatus status;
+    private String nodeMode;  // 节点部署模式：RAY / KUSCIA
     private String endpoint;
+    private String externalEndpoint;
     private Set<DeviceType> capabilities;
     private List<String> tags;
     private Long createTime;
@@ -33,8 +35,14 @@ public class Node {
     public NodeStatus getStatus() { return status; }
     public void setStatus(NodeStatus status) { this.status = status; }
 
+    public String getNodeMode() { return nodeMode; }
+    public void setNodeMode(String nodeMode) { this.nodeMode = nodeMode; }
+
     public String getEndpoint() { return endpoint; }
     public void setEndpoint(String endpoint) { this.endpoint = endpoint; }
+
+    public String getExternalEndpoint() { return externalEndpoint; }
+    public void setExternalEndpoint(String externalEndpoint) { this.externalEndpoint = externalEndpoint; }
 
     public Set<DeviceType> getCapabilities() { return capabilities; }
     public void setCapabilities(Set<DeviceType> capabilities) { this.capabilities = capabilities; }

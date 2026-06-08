@@ -35,7 +35,7 @@ public class AuditLogService {
             resourceId,
             detailsJson,
             ipAddress,
-            System.currentTimeMillis()
+            new java.sql.Timestamp(System.currentTimeMillis())
         );
     }
 

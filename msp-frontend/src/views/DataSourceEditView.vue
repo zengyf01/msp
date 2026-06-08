@@ -46,6 +46,14 @@
             <el-input v-model="form.database" placeholder="数据库名称" />
           </el-form-item>
 
+          <el-form-item label="用户名" prop="username">
+            <el-input v-model="form.username" placeholder="连接数据库的用户名（留空使用默认值）" />
+          </el-form-item>
+
+          <el-form-item label="密码" prop="password">
+            <el-input v-model="form.password" type="password" show-password placeholder="连接数据库的密码（留空使用默认值）" />
+          </el-form-item>
+
           <el-form-item label="表名">
             <el-input v-model="form.tableName" placeholder="表名（可选）" />
           </el-form-item>
@@ -99,6 +107,8 @@ const form = reactive<DataSourceRequest>({
   host: '',
   port: 3306,
   database: '',
+  username: '',
+  password: '',
   tableName: '',
   columns: []
 })
@@ -128,6 +138,8 @@ onMounted(async () => {
         form.host = ds.host || ''
         form.port = ds.port || 3306
         form.database = ds.database || ''
+        form.username = ds.username || ''
+        form.password = ds.password || ''
         form.tableName = ds.tableName || ''
         form.columns = ds.columns || []
       }

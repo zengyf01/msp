@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir pip --timeout 300 && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt --timeout 300
 
+# 降级 click 到 8.2.1 以修复 ray CLI deepcopy bug
+RUN pip install 'click<8.3' --no-cache-dir
+
 COPY src /app/src
 
 ENV PYTHONPATH=/app/src

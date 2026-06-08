@@ -20,10 +20,10 @@
         :row-style="{ cursor: 'pointer' }"
         @row-click="(row) => viewTask(row.taskId)"
       >
-        <el-table-column prop="name" label="任务名称" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="type" label="类型" width="100">
+        <el-table-column prop="name" label="任务名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="type" label="任务类型" width="120">
           <template #default="{ row }">
-            <el-tag size="small" effect="plain">{{ row.type }}</el-tag>
+            <el-tag size="small" effect="plain">{{ getTaskTypeLabel(row.type) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
@@ -33,15 +33,38 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" min-width="160">
+        <el-table-column prop="participants" label="参与方" min-width="140">
+          <template #default="{ row }">
+            {{ formatParticipants(row.participants) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="createTime" label="创建时间" min-width="150">
           <template #default="{ row }">
             <span class="time-text">{{ formatTime(row.createTime) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" min-width="180">
           <template #default="{ row }">
             <div @click.stop>
               <el-button size="small" text type="primary" @click="viewTask(row.taskId)">详情</el-button>
+              <el-button
+                size="small"
+                text
+                type="info"
+                @click="editTask(row.taskId)"
+                v-if="row.status === 'CREATED'"
+              >
+                编辑
+              </el-button>
+              <el-button
+                size="small"
+                text
+                type="success"
+                @click="handleExecute(row.taskId)"
+                v-if="row.status === 'CREATED'"
+              >
+                执行
+              </el-button>
               <el-button
                 size="small"
                 text
@@ -59,6 +82,14 @@
                 v-if="row.status === 'RUNNING' || row.status === 'PENDING'"
               >
                 取消
+              </el-button>
+              <el-button
+                size="small"
+                text
+                type="info"
+                @click="handleCopy(row.taskId, row.name)"
+              >
+                复制
               </el-button>
             </div>
           </template>
@@ -83,11 +114,13 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useTaskStore } from '@/stores/task'
+import { useNodeStore } from '@/stores/node'
 import { Plus } from '@element-plus/icons-vue'
 import type { TaskStatus } from '@/types'
 
 const router = useRouter()
 const taskStore = useTaskStore()
+const nodeStore = useNodeStore()
 
 const page = ref(1)
 
@@ -95,8 +128,21 @@ const tasks = computed(() => taskStore.tasks)
 const loading = computed(() => taskStore.loading)
 const total = computed(() => taskStore.total)
 
-onMounted(() => {
-  loadTasks()
+// 把 participants 里的 nodeId 转成中文 nodeName，找不到就回退到原 ID
+const formatParticipants = (participants?: string[]) => {
+  if (!participants || participants.length === 0) return '-'
+  return participants.map(id => {
+    const node = nodeStore.nodes.find(n => n.nodeId === id)
+    return node?.nodeName || id
+  }).join('、')
+}
+
+onMounted(async () => {
+  await Promise.all([
+    loadTasks(),
+    // 顺手把节点拉回来，方便中文名展示；失败也不阻塞
+    nodeStore.fetchNodes().catch(() => null)
+  ])
 })
 
 const loadTasks = async () => {
@@ -111,12 +157,27 @@ const viewTask = (taskId: string) => {
   router.push(`/tasks/${taskId}`)
 }
 
+const editTask = (taskId: string) => {
+  router.push(`/tasks/${taskId}/edit`)
+}
+
 const handleCancel = async (taskId: string) => {
   try {
     await taskStore.cancelTask(taskId)
     ElMessage.success('任务已取消')
+    loadTasks()
   } catch (error) {
     ElMessage.error('取消失败')
+  }
+}
+
+const handleExecute = async (taskId: string) => {
+  try {
+    await taskStore.executeTask(taskId)
+    ElMessage.success('任务已开始执行')
+    loadTasks()
+  } catch (error) {
+    ElMessage.error('执行失败')
   }
 }
 
@@ -149,6 +210,19 @@ const getStatusLabel = (status: TaskStatus) => {
   return labels[status] || status
 }
 
+const getTaskTypeLabel = (type: string) => {
+  const labels: Record<string, string> = {
+    PSI: '隐私集合求交',
+    MPC: '安全多方计算',
+    FEDERATED_LEARNING: '联邦学习',
+    CUSTOM_CODE: '自定义代码',
+    VERTICAL_FL: '纵向联邦学习',
+    COMPOUND_TASK: '复合任务',
+    COMPONENT_DAG: 'DAG任务'
+  }
+  return labels[type] || type
+}
+
 const handleDelete = async (taskId: string) => {
   try {
     await taskStore.deleteTask(taskId)
@@ -156,6 +230,17 @@ const handleDelete = async (taskId: string) => {
     loadTasks()
   } catch (error) {
     ElMessage.error('删除失败')
+  }
+}
+
+const handleCopy = async (taskId: string, taskName: string) => {
+  try {
+    const newName = taskName + ' (副本)'
+    const res = await taskStore.copyTask(taskId, newName)
+    ElMessage.success('任务已复制: ' + res.taskId)
+    loadTasks()
+  } catch (error: any) {
+    ElMessage.error('复制失败: ' + (error.message || '未知错误'))
   }
 }
 </script>

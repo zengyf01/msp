@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Task, TaskRequest, Node, NodeRegisterRequest, Page, TaskStatusResponse, TaskResultResponse, NodeRegisterResponse, DataSource, DataSourceRequest, DataSourceCreateResponse, ConnectionTestResponse, AuditLog, User, LoginResponse, Role, Permission, UserCreateRequest, UserUpdateRequest, RoleCreateRequest } from '@/types'
+import type { Task, TaskRequest, Node, NodeRegisterRequest, Page, TaskStatusResponse, TaskResultResponse, TaskExecutionResponse, NodeRegisterResponse, DataSource, DataSourceRequest, DataSourceCreateResponse, ConnectionTestResponse, AuditLog, User, LoginResponse, Role, Permission, UserCreateRequest, UserUpdateRequest, RoleCreateRequest, TableInfo, ColumnInfo } from '@/types'
 
 const TOKEN_KEY = 'msp_auth_token'
 
@@ -44,6 +44,15 @@ export const taskAPI = {
   createTask: (data: TaskRequest) =>
     api.post<{ data: { taskId: string; status: string } }>('/tasks', data),
 
+  saveDag: (data: TaskRequest) =>
+    api.post<{ data: { taskId: string; status: string } }>('/tasks/save', data),
+
+  updateTask: (taskId: string, data: TaskRequest) =>
+    api.put<{ data: boolean }>(`/tasks/${taskId}`, data),
+
+  executeTask: (taskId: string) =>
+    api.post<{ data: boolean }>(`/tasks/${taskId}/execute`),
+
   getTask: (taskId: string) =>
     api.get<{ data: Task }>(`/tasks/${taskId}`),
 
@@ -56,11 +65,20 @@ export const taskAPI = {
   getTaskResult: (taskId: string) =>
     api.get<{ data: TaskResultResponse }>(`/tasks/${taskId}/result`),
 
+  getTaskExecution: (taskId: string) =>
+    api.get<{ data: TaskExecutionResponse }>(`/tasks/${taskId}/execution`),
+
   retryTask: (taskId: string) =>
     api.post<{ data: { taskId: string; status: string } }>(`/tasks/${taskId}/retry`),
 
   cancelTask: (taskId: string) =>
     api.delete<{ data: boolean }>(`/tasks/${taskId}/cancel`),
+
+  stopTask: (taskId: string) =>
+    api.post<{ data: boolean }>(`/tasks/${taskId}/stop`),
+
+  copyTask: (taskId: string, newName?: string) =>
+    api.post<{ data: { taskId: string; status: string } }>(`/tasks/${taskId}/copy`, { name: newName }),
 }
 
 // 节点相关API
@@ -81,7 +99,7 @@ export const nodeAPI = {
     api.delete<{ data: boolean }>(`/nodes/${nodeId}`)
 }
 
-// 数据源相关API - 包含模拟节点创建
+// 数据源相关API
 export const dataSourceAPI = {
   createDataSource: (data: DataSourceRequest) =>
     api.post<{ data: DataSourceCreateResponse }>('/datasources', data),
@@ -91,6 +109,12 @@ export const dataSourceAPI = {
 
   getDataSource: (datasourceId: string) =>
     api.get<{ data: DataSource }>(`/datasources/${datasourceId}`),
+
+  getDataSourceTables: (datasourceId: string) =>
+    api.get<{ data: TableInfo[] }>(`/datasources/${datasourceId}/tables`),
+
+  getDataSourceColumns: (datasourceId: string, tableName: string) =>
+    api.get<{ data: ColumnInfo[] }>(`/datasources/${datasourceId}/columns`, { params: { tableName } }),
 
   updateDataSource: (datasourceId: string, data: DataSourceRequest) =>
     api.put<{ data: boolean }>(`/datasources/${datasourceId}`, data),
@@ -104,19 +128,8 @@ export const dataSourceAPI = {
   getDataSourcesByNode: (nodeId: string) =>
     api.get<{ data: DataSource[] }>(`/datasources/by-node/${nodeId}`),
 
-  createSimulatedNode: (params: {
-    nodeId: string
-    dbName: string
-    tableName: string
-    columnName: string
-  }) =>
-    api.post<{ data: boolean }>('/datasources/simulate', params),
-
   getDataSourceSampleData: (dbName: string, tableName: string) =>
-    api.post<{ data: any[] }>('/datasources/sample-data', { dbName, tableName }),
-
-  deleteSimulatedNode: (nodeId: string) =>
-    api.delete<{ data: boolean }>(`/datasources/simulate/${nodeId}`)
+    api.post<{ data: any[] }>('/datasources/sample-data', { dbName, tableName })
 }
 
 // 认证相关API
@@ -217,6 +230,54 @@ export const permissionAPI = {
 
   delete: (permissionId: string) =>
     api.delete<{ data: boolean }>(`/permissions/${permissionId}`)
+}
+
+// 系统配置相关API
+export const systemConfigAPI = {
+  getPlatformConfig: () =>
+    api.get<{ data: any }>('/system-config/platform'),
+
+  updatePlatformConfig: (data: any) =>
+    api.put<{ data: boolean }>('/system-config/platform', data),
+
+  getSecurityConfig: () =>
+    api.get<{ data: any }>('/system-config/security'),
+
+  updateSecurityConfig: (data: any) =>
+    api.put<{ data: boolean }>('/system-config/security', data),
+
+  getComputingConfig: () =>
+    api.get<{ data: any }>('/system-config/computing'),
+
+  updateComputingConfig: (data: any) =>
+    api.put<{ data: boolean }>('/system-config/computing', data),
+
+  getNotificationConfig: () =>
+    api.get<{ data: any }>('/system-config/notification'),
+
+  updateNotificationConfig: (data: any) =>
+    api.put<{ data: boolean }>('/system-config/notification', data),
+
+  getAllConfigs: () =>
+    api.get<{ data: any }>('/system-config')
+}
+
+// 告警相关API
+export const alertAPI = {
+  getAlertHistory: (params?: { limit?: number }) =>
+    api.get<{ data: any[] }>('/alerts', { params }),
+
+  getAlert: (alertId: string) =>
+    api.get<{ data: any }>(`/alerts/${alertId}`),
+
+  resolveAlert: (alertId: string) =>
+    api.post<{ data: boolean }>(`/alerts/${alertId}/resolve`),
+
+  clearResolvedAlerts: () =>
+    api.delete<{ data: boolean }>('/alerts/resolved'),
+
+  getAlertStats: () =>
+    api.get<{ data: any }>('/alerts/stats'),
 }
 
 export default api
