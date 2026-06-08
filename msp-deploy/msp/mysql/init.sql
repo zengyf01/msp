@@ -1,5 +1,8 @@
 -- 密算平台数据库初始化脚本 (MySQL 8.0)
 
+-- 强制使用 UTF-8 字符集加载, 避免 Docker-entrypoint 用 latin1 加载造成双重编码
+SET NAMES utf8mb4;
+
 -- 创建 Kuscia 数据库（供 Kuscia Master 使用）
 CREATE DATABASE IF NOT EXISTS kuscia_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -28,15 +31,44 @@ CREATE TABLE IF NOT EXISTS msp_tasks (
     type VARCHAR(32) NOT NULL,
     algorithm VARCHAR(64),
     status VARCHAR(32) NOT NULL DEFAULT 'CREATED',
+    node_mode VARCHAR(32) DEFAULT 'ray' COMMENT '节点模式: ray / kuscia',
     participants TEXT,
     inputs TEXT,
     parameters TEXT,
     description TEXT,
     code TEXT COMMENT '任务代码/DAG规格',
     result TEXT COMMENT '任务执行结果',
+    execution_log TEXT COMMENT '任务执行过程日志（JSON：分发 / 节点执行轨迹）',
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+-- 兼容老库（init.sql 早期版本没有 node_mode / execution_log 列），已存在则忽略
+-- 用存储过程判断列存在再加，避免 MySQL 5.7 / 8.0 都不支持的 IF NOT EXISTS 语法
+DROP PROCEDURE IF EXISTS msp_add_task_columns;
+DELIMITER //
+CREATE PROCEDURE msp_add_task_columns()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'msp_tasks'
+          AND COLUMN_NAME = 'node_mode'
+    ) THEN
+        ALTER TABLE msp_tasks ADD COLUMN node_mode VARCHAR(32) DEFAULT 'ray' COMMENT '节点模式: ray / kuscia';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'msp_tasks'
+          AND COLUMN_NAME = 'execution_log'
+    ) THEN
+        ALTER TABLE msp_tasks ADD COLUMN execution_log TEXT COMMENT '任务执行过程日志（JSON：分发 / 节点执行轨迹）';
+    END IF;
+END //
+DELIMITER ;
+CALL msp_add_task_columns();
+DROP PROCEDURE msp_add_task_columns;
 
 -- 数据源表
 CREATE TABLE IF NOT EXISTS msp_datasources (
@@ -47,12 +79,23 @@ CREATE TABLE IF NOT EXISTS msp_datasources (
     host VARCHAR(256),
     port INTEGER,
     database_name VARCHAR(128),
+    username VARCHAR(128),
+    password VARCHAR(256),
     table_name VARCHAR(128),
     columns TEXT,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (node_id) REFERENCES msp_nodes(node_id)
 );
+
+-- 兼容旧表：若表已存在但缺少 username/password 列，补上
+SET @c1 := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='msp_db' AND TABLE_NAME='msp_datasources' AND COLUMN_NAME='username');
+SET @sql1 := IF(@c1=0, 'ALTER TABLE msp_datasources ADD COLUMN username VARCHAR(128) AFTER database_name', 'DO 0');
+PREPARE stmt1 FROM @sql1; EXECUTE stmt1; DEALLOCATE PREPARE stmt1;
+
+SET @c2 := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='msp_db' AND TABLE_NAME='msp_datasources' AND COLUMN_NAME='password');
+SET @sql2 := IF(@c2=0, 'ALTER TABLE msp_datasources ADD COLUMN password VARCHAR(256) AFTER username', 'DO 0');
+PREPARE stmt2 FROM @sql2; EXECUTE stmt2; DEALLOCATE PREPARE stmt2;
 
 -- 审计日志表
 CREATE TABLE IF NOT EXISTS msp_audit_logs (
@@ -127,8 +170,8 @@ CREATE TABLE IF NOT EXISTS msp_role_permissions (
 
 -- 插入默认管理员用户 (密码: admin123, SHA-256 hash then Base64 encoded)
 INSERT INTO msp_users (user_id, username, password, role, enabled, create_time, update_time)
-VALUES ('admin-default-id', 'admin', 'jZae727K08KaOmKSgOaGzww/XVqGr/PKEgIMkjrcbJI=', 'ADMIN', TRUE, NOW(), NOW())
-ON DUPLICATE KEY UPDATE username = username;
+VALUES ('admin-default-id', 'admin', 'JAvlGPq9JyTdtvBO6x2llnRI1+gxwIyPqCKAn3THIKk=', 'ADMIN', TRUE, NOW(), NOW())
+ON DUPLICATE KEY UPDATE password = 'JAvlGPq9JyTdtvBO6x2llnRI1+gxwIyPqCKAn3THIKk=';
 
 -- 插入默认角色
 INSERT INTO msp_roles (role_id, role_code, role_name, description, status, create_time, update_time)
@@ -183,19 +226,26 @@ CREATE INDEX idx_roles_role_code ON msp_roles(role_code);
 CREATE INDEX idx_permissions_code ON msp_permissions(permission_code);
 CREATE INDEX idx_permissions_parent ON msp_permissions(parent_id);
 
--- 初始化三个医疗机构节点
+-- 初始化三个医疗机构节点 (使用 _utf8mb4 前缀强制 UTF-8, 防止双重编码)
 INSERT INTO msp_nodes (node_id, node_name, status, node_mode, endpoint, external_endpoint, capabilities, tags) VALUES
-('node-hospital', '医院', 'ONLINE', 'RAY', 'node-a:50051', 'localhost:50051', 'PSI,FEDERATED_LEARNING,MPC', '医院'),
-('node-research', '医疗研究所', 'ONLINE', 'RAY', 'node-b:50051', 'localhost:50052', 'PSI,FEDERATED_LEARNING,MPC', '医疗研究所'),
-('node-insurance', '保险公司', 'ONLINE', 'RAY', 'node-c:50051', 'localhost:50053', 'PSI,FEDERATED_LEARNING,MPC', '保险公司')
+('node-hospital', _utf8mb4'医院', 'ONLINE', 'RAY', 'node-a:50051', 'localhost:50051', 'PSI,FEDERATED_LEARNING,MPC', _utf8mb4'医院'),
+('node-research', _utf8mb4'医疗研究所', 'ONLINE', 'RAY', 'node-b:50051', 'localhost:50052', 'PSI,FEDERATED_LEARNING,MPC', _utf8mb4'医疗研究所'),
+('node-insurance', _utf8mb4'保险公司', 'ONLINE', 'RAY', 'node-c:50051', 'localhost:50053', 'PSI,FEDERATED_LEARNING,MPC', _utf8mb4'保险公司')
 ON DUPLICATE KEY UPDATE status=VALUES(status), node_mode=VALUES(node_mode);
 
 -- 初始化三个医疗机构数据源（数据源=数据库，包含多张表）
-INSERT INTO msp_datasources (datasource_id, node_id, name, type, host, port, database_name, table_name, columns) VALUES
--- 医院数据库
-('ds-hosp', 'node-hospital', '医院数据库', 'MYSQL', 'node-a-db', 3306, 'hospital_db', NULL, NULL),
--- 医疗研究所数据库
-('ds-research', 'node-research', '医疗研究所数据库', 'MYSQL', 'node-b-db', 3306, 'research_db', NULL, NULL),
--- 保险公司数据库
-('ds-insurance', 'node-insurance', '保险公司数据库', 'MYSQL', 'node-c-db', 3306, 'insurance_db', NULL, NULL)
-ON DUPLICATE KEY UPDATE name=VALUES(name);
+-- host/database_name/username/password 须与 node-*-db 容器实际配置一致
+INSERT INTO msp_datasources (datasource_id, node_id, name, type, host, port, database_name, username, password, table_name, columns) VALUES
+-- 医院数据库（node-a-db, 实际库: node_a_data, 凭据: root/nodea123）
+('ds-hosp', 'node-hospital', _utf8mb4'医院数据库', 'MYSQL', 'node-a-db', 3306, 'node_a_data', 'root', 'nodea123', NULL, NULL),
+-- 医疗研究所数据库（node-b-db, 实际库: node_b_data, 凭据: root/nodeb123）
+('ds-research', 'node-research', _utf8mb4'医疗研究所数据库', 'MYSQL', 'node-b-db', 3306, 'node_b_data', 'root', 'nodeb123', NULL, NULL),
+-- 保险公司数据库（node-c-db, 实际库: node_c_data, 凭据: root/nodec123）
+('ds-insurance', 'node-insurance', _utf8mb4'保险公司数据库', 'MYSQL', 'node-c-db', 3306, 'node_c_data', 'root', 'nodec123', NULL, NULL)
+ON DUPLICATE KEY UPDATE
+    name=VALUES(name),
+    host=VALUES(host),
+    port=VALUES(port),
+    database_name=VALUES(database_name),
+    username=VALUES(username),
+    password=VALUES(password);

@@ -38,8 +38,7 @@
     <div class="dag-toolbar">
       <el-button @click="onClear">清空画布</el-button>
       <el-button @click="onPreview">预览 DAG</el-button>
-      <el-button type="primary" @click="onExecute">执行 DAG</el-button>
-      <el-button type="success" @click="onSave">保存 DAG</el-button>
+      <el-button v-if="showSaveButton" type="success" @click="onSave">保存 DAG</el-button>
     </div>
 
     <!-- DAG 预览对话框 -->
@@ -63,8 +62,8 @@
       </el-form>
     </el-dialog>
 
-    <!-- 保存 DAG 对话框 -->
-    <el-dialog title="保存 DAG" v-model="saveDialogVisible" width="500px">
+    <!-- 保存 DAG 对话框（仅在 showSaveButton=true 时显示，新建走 wizard 流程） -->
+    <el-dialog v-if="showSaveButton" title="保存 DAG" v-model="saveDialogVisible" width="500px">
       <el-form :model="dagForm" label-width="100px">
         <el-form-item label="任务名称" required>
           <el-input v-model="dagForm.name" placeholder="请输入任务名称" />
@@ -89,12 +88,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import ComponentPanel from './components/ComponentPanel.vue'
 import DAGCanvas from './components/DAGCanvas.vue'
 import NodeConfigPanel from './components/NodeConfigPanel.vue'
 import { useTaskStore } from '@/stores/task'
+
+const props = defineProps<{
+  // 是否显示内置的"保存 DAG"按钮和保存对话框。默认 false ——
+  // 新建/编辑走外层 TaskDagWizard 的保存逻辑，避免双入口。
+  showSaveButton?: boolean
+  // 画布节点的 v-model。父组件拿到这份数据用于拼装保存请求。
+  modelValue?: { nodes: any[]; edges: any[] }
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: { nodes: any[]; edges: any[] }): void
+}>()
 
 const taskStore = useTaskStore()
 
@@ -173,8 +184,43 @@ const componentList = [
 ]
 
 // DAG 数据
-const dagNodes = ref<any[]>([])
-const dagEdges = ref<any[]>([])
+// 内部用本地 ref，画布改动通过 watcher 同步给父组件（v-model）
+const localNodes = ref<any[]>([])
+const localEdges = ref<any[]>([])
+// 初始从父组件的 modelValue 灌入（如果调用方传了的话）
+const seedNodes = props.modelValue?.nodes ? [...props.modelValue.nodes] : []
+const seedEdges = props.modelValue?.edges ? [...props.modelValue.edges] : []
+if (seedNodes.length) localNodes.value = seedNodes
+if (seedEdges.length) localEdges.value = seedEdges
+const dagNodes = localNodes
+const dagEdges = localEdges
+
+// 父组件异步更新 modelValue（比如 wizard 加载完草稿反序列化后）也要灌进来。
+// 用 isSyncingFromProps 标志位吞掉这一次 emit，避免"父→子→父"反馈环。
+let isSyncingFromProps = false
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    if (!newVal) return
+    isSyncingFromProps = true
+    localNodes.value = Array.isArray(newVal.nodes) ? [...newVal.nodes] : []
+    localEdges.value = Array.isArray(newVal.edges) ? [...newVal.edges] : []
+    // nextTick 后再清标志，让"本次同步产生的子→父 emit"被吞掉
+    nextTick(() => {
+      isSyncingFromProps = false
+    })
+  },
+  { deep: true }
+)
+
+// 任意一边变化都把当前画布打包回父组件
+watch([localNodes, localEdges], ([n, e]) => {
+  if (isSyncingFromProps) return
+  // eslint-disable-next-line no-console
+  console.log('[DAGDesignerView] emit update:modelValue', { nodes: n, edges: e })
+  emit('update:modelValue', { nodes: n, edges: e })
+}, { deep: true })
+
 const selectedNode = ref<any>(null)
 const dagCanvas = ref<any>(null)
 
@@ -444,6 +490,8 @@ const onNodeDelete = (nodeId: string) => {
 }
 
 const onNodeConfigUpdate = (config: any) => {
+  // eslint-disable-next-line no-console
+  console.log('[DAGDesignerView] onNodeConfigUpdate', config, 'selectedNode=', selectedNode.value?.nodeId)
   if (selectedNode.value) {
     selectedNode.value.attrs = config
     onNodeUpdate(selectedNode.value)

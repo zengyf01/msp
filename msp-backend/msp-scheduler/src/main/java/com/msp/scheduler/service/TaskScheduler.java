@@ -24,6 +24,14 @@ public interface TaskScheduler {
     String saveDag(TaskRequest request);
 
     /**
+     * 更新已保存的任务（仅允许 CREATED 状态）
+     * @param taskId 任务ID
+     * @param request 任务请求
+     * @return 是否成功
+     */
+    boolean updateTask(String taskId, TaskRequest request);
+
+    /**
      * 执行已保存的任务
      * @param taskId 任务ID
      */
@@ -55,6 +63,14 @@ public interface TaskScheduler {
      * @return 新任务ID
      */
     String retryTask(String taskId);
+
+    /**
+     * 复制任务（基于原任务定义创建新任务，状态为 CREATED）
+     * @param taskId 原任务ID
+     * @param newName 新任务名称（可选，为空则自动添加" (副本)"后缀）
+     * @return 新任务ID
+     */
+    String copyTask(String taskId, String newName);
 
     /**
      * 获取任务详情

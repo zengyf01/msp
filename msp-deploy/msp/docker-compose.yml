@@ -1,5 +1,88 @@
 version: '3.8'
 
+# ============================================================
+# MSP部署说明文档
+# ============================================================
+#
+# 一、部署模式
+# --------------------------------------------------------------
+# 本项目支持三种部署模式，通过不同的 docker-compose 文件选择：
+#
+# 模式 | 配置文件 | 说明
+# -----------------|---------------------------|----------------------------------
+# docker-bridge    | docker-compose.yml         | 默认模式，使用 Docker 桥接网络
+# docker-host      | docker-compose.host.yml   | 主机网络模式，使用 localhost 通信
+# kubernetes | docker-compose.kubernetes.yml | K8s 模式，使用 Kuscia 编排
+#
+# 启动方式:
+#   桥接模式(默认):     docker-compose up -d
+#   主机模式:           docker-compose -f docker-compose.host.yml up -d
+#   Kubernetes模式:     docker-compose -f docker-compose.kubernetes.yml up -d
+#
+# 二、SecretFlow bRPC 与 PSI 说明
+# --------------------------------------------------------------
+# PSI (Private Set Intersection) 隐私求交集计算，支持两种模式：
+#
+# 1. Real PSI (bRPC 模式)
+#    - 使用 SecretFlow 的 bRPC 协议进行跨节点加密通信
+#    - 数据真正在节点间传输和加密
+#    - 安全性高，适用于生产环境
+#
+# 2. Test PSI (回退模式)
+#    - 当 bRPC 不可用时自动回退
+#    - 不进行实际跨节点加密
+#    - 仅本地处理，返回笛卡尔积近似结果
+#    - 适用于开发调试
+#
+# bRPC 失败原因:
+# - macOS/Windows Docker Desktop 不支持 network_mode: host
+# - bRPC 尝试绑定 Docker 桥接网络 IP (172.18.0.x) 失败
+# - Linux容器无法绑定到 Docker Desktop内部网络 IP
+#
+# 三、各环境下 bRPC 支持情况
+# --------------------------------------------------------------
+# 环境 | bRPC 支持 | 推荐模式 | PSI 类型
+# ---------------------|----------|-------------------|-----------
+# Linux 服务器          | ✅ 支持   | docker-host       | Real PSI
+# macOS Docker Desktop  | ❌ 不支持 | docker-bridge     | Test PSI
+# Windows Docker Desktop| ❌ 不支持 | docker-bridge     | Test PSI
+# K8s 集群 | ✅ 支持   | kubernetes | Real PSI
+#
+# 四、端口映射说明
+# --------------------------------------------------------------
+# 服务 | 容器端口 | 映射端口  | 说明
+# -------------|---------|----------|-------------------
+# mysql | 3306    | 13306    | MSP 元数据库
+# scheduler | 8081    | 18081    | 任务调度服务
+# gateway | 8090    | 8092     | API 网关
+# node-manager | 8082    | 8082     | 节点管理服务
+# frontend     | 3000    | 3000     | 前端 Web
+# node-a | 50051 | 50051    | 节点 A gRPC
+# node-a       | 8000    | 8000 | 节点 A SPU
+# node-b       | 50051   | 50053    | 节点 B gRPC
+# node-b       | 8000    | 8001    | 节点 B SPU (容器内8000,映射到8001)
+# node-c       | 50051   | 50054    | 节点 C gRPC
+# node-c       | 8000    | 8002    | 节点 C SPU (容器内8000, 映射到8002)
+#
+# 注意: node-b 和 node-c 的 SPU 端口映射使用 8001:8000 和 8002:8000
+#外部访问时使用 8001 和 8002，但容器内部监听 8000
+#
+# 五、常见问题
+# --------------------------------------------------------------
+# Q: 为什么 PSI 计算结果不对？
+# A: 检查是否使用了 Test PSI。查看日志关键词 "fallback to test PSI"
+#    如果需要 Real PSI，请使用 Linux 服务器部署 docker-host 模式
+#
+# Q: node-b/node-c 无法连接 node-a 的 SPU？
+# A: 检查 docker-compose.yml 中的 SPU_NODE_* 环境变量配置
+#    确保端口与实际映射端口一致 (node-b 用 8001，node-c 用 8002)
+#
+# Q: macOS/Windows 上如何完整测试 PSI？
+# A: 只能测试流程，无法真正执行跨节点 PSI。建议：
+#   1. 使用 test PSI 验证流程
+#    2. 在 Linux 服务器上部署完整测试
+# ============================================================
+
 services:
   # MySQL 数据库（主库，存储MSP元数据）
   mysql:
@@ -10,45 +93,36 @@ services:
       MYSQL_USER: msp
       MYSQL_PASSWORD: ${DB_PASSWORD:-msp123456}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root123456}
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
     ports:
-      - "3306:3306"
+      - "13306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
     networks:
       - msp-network
-
-  # Kuscia Master (K8s编排) - 可选，不使用时可删除
-  kuscia-master:
-    image: secretflow/kuscia:latest
-    container_name: kuscia-master
-    command: ["sh", "-c", "rm -rf /home/kuscia/data/* 2>/dev/null; mkdir -p /home/kuscia/data/etc/config && kuscia init --mode master -d kuscia-master -e 'mysql://msp:msp123456@tcp(msp-mysql:3306)/kuscia_db?charset=utf8mb4&parseTime=True&loc=Local' -p NOTLS > /home/kuscia/data/etc/config/kuscia.yaml && kuscia start -c /home/kuscia/data/etc/config/kuscia.yaml"]
-    ports:
-      - "8080:8080"
-      - "8081:8081"
-      - "8083:8083"
-    volumes:
-      - kuscia_data:/home/kuscia/data
-    depends_on:
-      - mysql
-    environment:
-      - KUSCIA_API_ADDRESS=0.0.0.0:8083
-      - KUSCIA_MASTER_IP=kuscia-master
-    networks:
-      - msp-network
-    # Kuscia可选，不启动时NODE_MODE=ray生效
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # 调度服务
   scheduler:
     build:
       context: ../../msp-backend
       dockerfile: msp-scheduler/Dockerfile
+    image: docker-scheduler:latest
     container_name: msp-scheduler
     ports:
       - "18081:8081"
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&collationConnection=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=msp
@@ -62,6 +136,7 @@ services:
     build:
       context: ../../msp-backend
       dockerfile: msp-gateway/Dockerfile
+    image: docker-gateway:latest
     container_name: msp-gateway
     ports:
       - "8092:8090"
@@ -77,11 +152,13 @@ services:
     build:
       context: ../../msp-backend
       dockerfile: msp-node-manager/Dockerfile
+    image: docker-node-manager:latest
     container_name: msp-node-manager
     ports:
       - "8082:8082"
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&collationConnection=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=msp
@@ -95,6 +172,7 @@ services:
     build:
       context: ../../msp-frontend
       dockerfile: Dockerfile
+    image: docker-frontend:latest
     container_name: msp-frontend
     ports:
       - "3000:3000"
@@ -116,43 +194,73 @@ services:
       - "3307:3306"
     volumes:
       - node_a_data:/var/lib/mysql
+      - ./node-a-db/init.sql:/docker-entrypoint-initdb.d/init.sql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     networks:
       - msp-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pnodea123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   node-a:
     build:
-      context: ./node-a
+      context: ../../msp-node
       dockerfile: Dockerfile
+    image: docker-node-a:latest
     container_name: node-a
     ports:
       - "50051:50051"
+      - "50052:50052"
       - "6379:6379"
+      - "8000:8000"
     depends_on:
-      - node-a-db
+      node-a-db:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
     environment:
+      - DEPLOY_MODE=${DEPLOY_MODE:-docker-bridge}
       - NODE_ID=node-hospital
       - NODE_NAME=医院
       - NODE_MODE=RAY
+      # 动态参与方配置
+      - SELF_PARTY=node-hospital
+      - PARTIES=node-hospital,node-research,node-insurance
+      - RAY_HEAD_PARTY=node-hospital
+      - PSI_RECEIVER=node-hospital
+      - PSI_KEY_COLUMN=id
       - DB_HOST=node-a-db
       - DB_PORT=3306
       - DB_USER=root
       - DB_PASSWORD=nodea123
       - DB_NAME=node_a_data
       - GRPC_PORT=50051
+      - HTTP_PORT=50052
       - SECRETFLOW_MODE=true
-      # Ray集群模式配置
+      - HEARTBEAT_INTERVAL=10
+      # Ray集群配置
       - RAY_HEAD=true
-      # Ray Head节点地址（供Worker连接）
       - RAY_HEAD_ADDRESS=node-a:6379
-      # Kuscia配置（nodeMode=kuscia时使用）
-      - KUSCIA_MASTER=http://kuscia-master:8080
-      - KUSCIA_NODE_TOKEN=KgHPmGpqvIIkSBgblsHHgbWif9yTB3Gd
+      - RAY_HEAD_PORT=6379
+      - SPU_PORT=8000
+      - ALL_PARTIES=node-hospital,node-research,node-insurance
+      # SPU 地址 - 根据部署模式动态选择
+      - SPU_NODE_HOSPITAL=node-a:8000
+      - SPU_NODE_RESEARCH=node-b:8001
+      - SPU_NODE_INSURANCE=node-c:8002
+      # MSP数据库连接
+      - MSP_DB_HOST=msp-mysql
+      - MSP_DB_PORT=3306
+      - MSP_DB_USER=msp
+      - MSP_DB_PASSWORD=${DB_PASSWORD:-msp123456}
+      - MSP_DB_NAME=msp_db
     networks:
       - msp-network
 
   # ==========================================
-  # 参与方B节点 (Ray Worker + 可选Kuscia Agent合并)
+  # 参与方B节点
   # ==========================================
   node-b-db:
     image: mysql:8
@@ -164,41 +272,67 @@ services:
       - "3308:3306"
     volumes:
       - node_b_data:/var/lib/mysql
+      - ./node-b-db/init.sql:/docker-entrypoint-initdb.d/init.sql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     networks:
       - msp-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pnodeb123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   node-b:
     build:
-      context: ./node-b
+      context: ../../msp-node
       dockerfile: Dockerfile
+    image: docker-node-b:latest
     container_name: node-b
     ports:
-      - "50052:50051"
+      - "50053:50053"
+      - "8001:8000"
     depends_on:
-      - node-b-db
+      node-b-db:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
     environment:
+      - DEPLOY_MODE=${DEPLOY_MODE:-docker-bridge}
       - NODE_ID=node-research
       - NODE_NAME=医疗研究所
       - NODE_MODE=RAY
+      - SELF_PARTY=node-research
+      - PARTIES=node-hospital,node-research,node-insurance
+      - RAY_HEAD_PARTY=node-hospital
+      - PSI_RECEIVER=node-hospital
+      - PSI_KEY_COLUMN=id
       - DB_HOST=node-b-db
       - DB_PORT=3306
       - DB_USER=root
       - DB_PASSWORD=nodeb123
       - DB_NAME=node_b_data
       - GRPC_PORT=50051
+      - HTTP_PORT=50053
       - SECRETFLOW_MODE=true
-      # Ray集群模式配置
+      - HEARTBEAT_INTERVAL=10
       - RAY_HEAD=false
       - RAY_HEAD_ADDRESS=node-a:6379
-      # Kuscia配置（nodeMode=kuscia时使用）
-      - KUSCIA_MASTER=http://kuscia-master:8080
-      - KUSCIA_NODE_TOKEN=23AJ85a5hrv33XAtvXsYSBiBGrVskqYB
+      - RAY_HEAD_PORT=6379
+      - SPU_PORT=8001
+      - ALL_PARTIES=node-hospital,node-research,node-insurance
+      - SPU_NODE_HOSPITAL=node-a:8000
+      - SPU_NODE_RESEARCH=node-b:8001
+      - SPU_NODE_INSURANCE=node-c:8002
+      - MSP_DB_HOST=msp-mysql
+      - MSP_DB_PORT=3306
+      - MSP_DB_USER=msp
+      - MSP_DB_PASSWORD=${DB_PASSWORD:-msp123456}
+      - MSP_DB_NAME=msp_db
     networks:
       - msp-network
 
   # ==========================================
-  # 参与方C节点（Ray Worker，用于PSI等三方场景）
+  # 参与方C节点
   # ==========================================
   node-c-db:
     image: mysql:8
@@ -210,35 +344,88 @@ services:
       - "3310:3306"
     volumes:
       - node_c_data:/var/lib/mysql
+      - ./node-c-db/init.sql:/docker-entrypoint-initdb.d/init.sql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     networks:
       - msp-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pnodec123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   node-c:
     build:
       context: ../../msp-node
       dockerfile: Dockerfile
+    image: docker-node-c:latest
     container_name: node-c
     ports:
-      - "50053:50051"
+      - "50054:50054"
+      - "8002:8000"
     depends_on:
-      - node-c-db
+      node-c-db:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
     environment:
+      - DEPLOY_MODE=${DEPLOY_MODE:-docker-bridge}
       - NODE_ID=node-insurance
       - NODE_NAME=保险公司
       - NODE_MODE=RAY
+      - SELF_PARTY=node-insurance
+      - PARTIES=node-hospital,node-research,node-insurance
+      - RAY_HEAD_PARTY=node-hospital
+      - PSI_RECEIVER=node-hospital
+      - PSI_KEY_COLUMN=id
       - DB_HOST=node-c-db
       - DB_PORT=3306
       - DB_USER=root
       - DB_PASSWORD=nodec123
       - DB_NAME=node_c_data
       - GRPC_PORT=50051
+      - HTTP_PORT=50054
       - SECRETFLOW_MODE=true
-      # Ray集群模式配置
+      - HEARTBEAT_INTERVAL=10
       - RAY_HEAD=false
       - RAY_HEAD_ADDRESS=node-a:6379
+      - RAY_HEAD_PORT=6379
+      - SPU_PORT=8002
+      - ALL_PARTIES=node-hospital,node-research,node-insurance
+      - SPU_NODE_HOSPITAL=node-a:8000
+      - SPU_NODE_RESEARCH=node-b:8001
+      - SPU_NODE_INSURANCE=node-c:8002
+      - MSP_DB_HOST=msp-mysql
+      - MSP_DB_PORT=3306
+      - MSP_DB_USER=msp
+      - MSP_DB_PASSWORD=${DB_PASSWORD:-msp123456}
+      - MSP_DB_NAME=msp_db
     networks:
       - msp-network
+
+  # ==========================================
+  # Kuscia Master (K8s编排) - 可选
+  # ==========================================
+  kuscia-master:
+    image: secretflow/kuscia:latest
+    container_name: kuscia-master
+    command: ["sh", "-c", "rm -rf /home/kuscia/data/* 2>/dev/null; mkdir -p /home/kuscia/data/etc/config && kuscia init --mode master -d kuscia-master -e 'mysql://msp:msp123456@tcp(msp-mysql:3306)/kuscia_db?charset=utf8mb4&parseTime=True&loc=Local' -p NOTLS > /home/kuscia/data/etc/config/kuscia.yaml && kuscia start -c /home/kuscia/data/etc/config/kuscia.yaml"]
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "8083:8083"
+    volumes:
+      - kuscia_data:/home/kuscia/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - KUSCIA_API_ADDRESS=0.0.0.0:8083
+      - KUSCIA_MASTER_IP=kuscia-master
+    networks:
+      - msp-network
+    profiles:
+      - kubernetes
 
 networks:
   msp-network:

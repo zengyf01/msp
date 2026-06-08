@@ -1,9 +1,11 @@
 package com.msp.scheduler.service;
 
+import com.msp.common.core.ColumnInfo;
 import com.msp.common.core.DataSource;
 import com.msp.common.core.ErrorCode;
 import com.msp.common.core.MspException;
 import com.msp.common.core.Page;
+import com.msp.common.core.TableInfo;
 import com.msp.scheduler.repository.DataSourceRepository;
 import org.springframework.stereotype.Service;
 
@@ -89,117 +91,7 @@ public class DataSourceServiceImpl implements DataSourceService {
     }
 
     @Override
-    public boolean createSimulatedNode(String nodeId, String dbName, String tableName, String columnName) {
-        // 检查是否为本地测试环境（演示功能仅限本地）
-        String hostname = System.getenv("COMPUTERNAME");
-        if (hostname == null) {
-            hostname = System.getenv("HOSTNAME");
-        }
-
-        try {
-            // 连接主数据库（使用root用户，因为需要创建数据库和用户）
-            String masterUrl = "jdbc:mysql://mysql:3306?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai";
-            try (Connection masterConn = DriverManager.getConnection(masterUrl, "root", "root123456")) {
-                // 创建节点数据库
-                String createDbSql = String.format("CREATE DATABASE IF NOT EXISTS %s", dbName);
-                masterConn.createStatement().execute(createDbSql);
-
-                // 创建用户并授权
-                String createUserSql = String.format(
-                    "CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s123'",
-                    dbName.replace("_db", "").replace("node_", "node"),
-                    dbName.replace("_db", "").replace("node_", "node")
-                );
-                masterConn.createStatement().execute(createUserSql);
-
-                String grantSql = String.format(
-                    "GRANT ALL PRIVILEGES ON %s.* TO '%s'@'%%'",
-                    dbName,
-                    dbName.replace("_db", "").replace("node_", "node")
-                );
-                masterConn.createStatement().execute(grantSql);
-                masterConn.createStatement().execute("FLUSH PRIVILEGES");
-
-                // 切换到节点数据库
-                masterConn.createStatement().execute("USE " + dbName);
-
-                // 创建示例数据表
-                String createTableSql;
-                if ("id_card".equals(columnName)) {
-                    createTableSql = String.format(
-                        "CREATE TABLE IF NOT EXISTS %s (" +
-                        "  id INT PRIMARY KEY AUTO_INCREMENT," +
-                        "  name VARCHAR(50)," +
-                        "  %s VARCHAR(20)," +
-                        "  email VARCHAR(100)" +
-                        ")",
-                        tableName, columnName
-                    );
-                } else {
-                    createTableSql = String.format(
-                        "CREATE TABLE IF NOT EXISTS %s (" +
-                        "  id INT PRIMARY KEY AUTO_INCREMENT," +
-                        "  username VARCHAR(50)," +
-                        "  %s VARCHAR(20)," +
-                        "  address VARCHAR(200)" +
-                        ")",
-                        tableName, columnName
-                    );
-                }
-                masterConn.createStatement().execute(createTableSql);
-
-                // 插入示例数据
-                String insertSql;
-                if ("id_card".equals(columnName)) {
-                    insertSql = String.format(
-                        "INSERT INTO %s (name, %s, email) VALUES " +
-                        "('张三', '110101199001011234', 'zhangsan@example.com')," +
-                        "('李四', '110101199001011235', 'lisi@example.com')," +
-                        "('王五', '110101199001011236', 'wangwu@example.com')," +
-                        "('赵六', '110101199001011237', 'zhaoliu@example.com')",
-                        tableName, columnName
-                    );
-                } else {
-                    insertSql = String.format(
-                        "INSERT INTO %s (username, %s, address) VALUES " +
-                        "('Alice', '13800138001', '北京市朝阳区')," +
-                        "('Bob', '13800138002', '上海市浦东新区')," +
-                        "('Charlie', '13800138003', '广州市天河区')," +
-                        "('David', '13800138004', '深圳市南山区')",
-                        tableName, columnName
-                    );
-                }
-                masterConn.createStatement().execute(insertSql);
-            }
-            return true;
-        } catch (Exception e) {
-            throw new RuntimeException("创建模拟节点失败: " + e.getMessage(), e);
-        }
-    }
-
-    @Override
-    public boolean deleteSimulatedNode(String nodeId) {
-        try {
-            String masterUrl = "jdbc:mysql://mysql:3306?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai";
-            try (Connection masterConn = DriverManager.getConnection(masterUrl, "root", "root123456")) {
-                // Docker Compose 模拟节点（node-a, node-b, node-c）
-                if (nodeId.matches("node-[abc]")) {
-                    String dbName = "node_" + nodeId.split("-")[1] + "_data";
-                    masterConn.createStatement().execute("DROP DATABASE IF EXISTS " + dbName);
-                } else {
-                    // 后端API创建的模拟节点
-                    String dbName = "node_" + nodeId.split("-")[1] + "_db";
-                    masterConn.createStatement().execute("DROP DATABASE IF EXISTS " + dbName);
-                }
-            }
-            return true;
-        } catch (Exception e) {
-            throw new RuntimeException("删除模拟节点失败: " + e.getMessage(), e);
-        }
-    }
-
-    @Override
-    public List<List<Object>> getSimulatedNodeSampleData(String dbName, String tableName) {
+    public List<List<Object>> getSampleData(String dbName, String tableName) {
         try {
             String url = String.format("jdbc:mysql://mysql:3306/%s?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai", dbName);
             String dbUser = dbName.replace("_db", "").replace("node_", "node");
@@ -225,21 +117,23 @@ public class DataSourceServiceImpl implements DataSourceService {
     }
 
     @Override
-    public List<String> getDataSourceTables(String datasourceId) {
+    public List<TableInfo> getDataSourceTables(String datasourceId) {
         DataSource ds = dataSourceRepository.findById(datasourceId)
             .orElseThrow(() -> new MspException(ErrorCode.DATA_SOURCE_ERROR, "DataSource not found: " + datasourceId));
 
         try {
-            String url = String.format("jdbc:mysql://%s:%d/%s?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai",
+            String url = String.format("jdbc:mysql://%s:%d/%s?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai",
                 ds.getHost(), ds.getPort() != null ? ds.getPort() : 3306, ds.getDatabase());
-            String dbUser = "msp";
-            String dbPass = "msp123456";
 
-            try (Connection conn = DriverManager.getConnection(url, dbUser, dbPass)) {
+            try (Connection conn = DriverManager.getConnection(url, resolveUser(ds), resolvePass(ds))) {
+                // 修复 MySQL Connector/J 元数据查询 REMARKS 用 Latin-1 解析的 bug：
+                // 直接 getBytes 拿原始字节（实为 UTF-8），再按 UTF-8 重新解码
                 var rs = conn.getMetaData().getTables(ds.getDatabase(), null, null, new String[]{"TABLE"});
-                java.util.List<String> tables = new java.util.ArrayList<>();
+                java.util.List<TableInfo> tables = new java.util.ArrayList<>();
                 while (rs.next()) {
-                    tables.add(rs.getString("TABLE_NAME"));
+                    String name = rs.getString("TABLE_NAME");
+                    String comment = decodeRemarks(rs.getBytes("REMARKS"));
+                    tables.add(new TableInfo(name, comment));
                 }
                 return tables;
             }
@@ -249,21 +143,22 @@ public class DataSourceServiceImpl implements DataSourceService {
     }
 
     @Override
-    public List<String> getDataSourceColumns(String datasourceId, String tableName) {
+    public List<ColumnInfo> getDataSourceColumns(String datasourceId, String tableName) {
         DataSource ds = dataSourceRepository.findById(datasourceId)
             .orElseThrow(() -> new MspException(ErrorCode.DATA_SOURCE_ERROR, "DataSource not found: " + datasourceId));
 
         try {
-            String url = String.format("jdbc:mysql://%s:%d/%s?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai",
+            String url = String.format("jdbc:mysql://%s:%d/%s?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai",
                 ds.getHost(), ds.getPort() != null ? ds.getPort() : 3306, ds.getDatabase());
-            String dbUser = "msp";
-            String dbPass = "msp123456";
 
-            try (Connection conn = DriverManager.getConnection(url, dbUser, dbPass)) {
+            try (Connection conn = DriverManager.getConnection(url, resolveUser(ds), resolvePass(ds))) {
+                // 同上：getBytes + UTF-8 重新解码
                 var rs = conn.getMetaData().getColumns(ds.getDatabase(), null, tableName, null);
-                java.util.List<String> columns = new java.util.ArrayList<>();
+                java.util.List<ColumnInfo> columns = new java.util.ArrayList<>();
                 while (rs.next()) {
-                    columns.add(rs.getString("COLUMN_NAME"));
+                    String name = rs.getString("COLUMN_NAME");
+                    String comment = decodeRemarks(rs.getBytes("REMARKS"));
+                    columns.add(new ColumnInfo(name, comment));
                 }
                 return columns;
             }
@@ -272,10 +167,49 @@ public class DataSourceServiceImpl implements DataSourceService {
         }
     }
 
+    /**
+     * 修复 MySQL Connector/J DatabaseMetaData 返回的 REMARKS 字段被当成 Latin-1 解码的 bug。
+     * <p>实际字节是 UTF-8，但 getString() 把每个字节当一个 char。getBytes() 拿到的是原始字节流，
+     * 用 UTF-8 重新 new String 即可恢复正确字符。</p>
+     */
+    private String decodeRemarks(byte[] bytes) {
+        if (bytes == null) {
+            return null;
+        }
+        try {
+            return new String(bytes, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            return new String(bytes);
+        }
+    }
+
+    /**
+     * 解析数据源连接用户名：优先使用数据源自身的 username，
+     * 为空时回退到环境变量或默认值（兼容历史数据）。
+     */
+    private String resolveUser(DataSource ds) {
+        if (ds.getUsername() != null && !ds.getUsername().isEmpty()) {
+            return ds.getUsername();
+        }
+        String envUser = System.getenv("DATA_SOURCE_DB_USER");
+        return envUser != null ? envUser : "msp";
+    }
+
+    /**
+     * 解析数据源连接密码：优先使用数据源自身的 password。
+     */
+    private String resolvePass(DataSource ds) {
+        if (ds.getPassword() != null && !ds.getPassword().isEmpty()) {
+            return ds.getPassword();
+        }
+        String envPass = System.getenv("DATA_SOURCE_DB_PASSWORD");
+        return envPass != null ? envPass : "msp123456";
+    }
+
     private boolean testMySQLConnection(DataSource ds) {
         String url = String.format("jdbc:mysql://%s:%d/%s",
             ds.getHost(), ds.getPort() != null ? ds.getPort() : 3306, ds.getDatabase());
-        try (Connection conn = DriverManager.getConnection(url, "msp", "msp123456")) {
+        try (Connection conn = DriverManager.getConnection(url, resolveUser(ds), resolvePass(ds))) {
             return conn.isValid(5);
         } catch (Exception e) {
             return false;
@@ -285,7 +219,7 @@ public class DataSourceServiceImpl implements DataSourceService {
     private boolean testPostgreSQLConnection(DataSource ds) {
         String url = String.format("jdbc:postgresql://%s:%d/%s",
             ds.getHost(), ds.getPort() != null ? ds.getPort() : 5432, ds.getDatabase());
-        try (Connection conn = DriverManager.getConnection(url, "msp", "msp123456")) {
+        try (Connection conn = DriverManager.getConnection(url, resolveUser(ds), resolvePass(ds))) {
             return conn.isValid(5);
         } catch (Exception e) {
             return false;

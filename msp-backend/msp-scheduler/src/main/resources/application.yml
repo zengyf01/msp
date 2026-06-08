@@ -40,6 +40,11 @@ msp:
     max-parallelism: 10
     task-timeout-minutes: 60
 
+# 任务恢复配置（禁用自动重试）
+task:
+  recovery:
+    enabled: false
+
 # 节点健康检查配置
 node:
   health:

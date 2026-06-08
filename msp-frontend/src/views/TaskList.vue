@@ -33,9 +33,9 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="participants" label="参与方" min-width="120">
+        <el-table-column prop="participants" label="参与方" min-width="140">
           <template #default="{ row }">
-            {{ row.participants?.join(', ') || '-' }}
+            {{ formatParticipants(row.participants) }}
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" min-width="150">
@@ -43,10 +43,19 @@
             <span class="time-text">{{ formatTime(row.createTime) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="120">
+        <el-table-column label="操作" min-width="180">
           <template #default="{ row }">
             <div @click.stop>
               <el-button size="small" text type="primary" @click="viewTask(row.taskId)">详情</el-button>
+              <el-button
+                size="small"
+                text
+                type="info"
+                @click="editTask(row.taskId)"
+                v-if="row.status === 'CREATED'"
+              >
+                编辑
+              </el-button>
               <el-button
                 size="small"
                 text
@@ -74,6 +83,14 @@
               >
                 取消
               </el-button>
+              <el-button
+                size="small"
+                text
+                type="info"
+                @click="handleCopy(row.taskId, row.name)"
+              >
+                复制
+              </el-button>
             </div>
           </template>
         </el-table-column>
@@ -97,11 +114,13 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useTaskStore } from '@/stores/task'
+import { useNodeStore } from '@/stores/node'
 import { Plus } from '@element-plus/icons-vue'
 import type { TaskStatus } from '@/types'
 
 const router = useRouter()
 const taskStore = useTaskStore()
+const nodeStore = useNodeStore()
 
 const page = ref(1)
 
@@ -109,8 +128,21 @@ const tasks = computed(() => taskStore.tasks)
 const loading = computed(() => taskStore.loading)
 const total = computed(() => taskStore.total)
 
-onMounted(() => {
-  loadTasks()
+// 把 participants 里的 nodeId 转成中文 nodeName，找不到就回退到原 ID
+const formatParticipants = (participants?: string[]) => {
+  if (!participants || participants.length === 0) return '-'
+  return participants.map(id => {
+    const node = nodeStore.nodes.find(n => n.nodeId === id)
+    return node?.nodeName || id
+  }).join('、')
+}
+
+onMounted(async () => {
+  await Promise.all([
+    loadTasks(),
+    // 顺手把节点拉回来，方便中文名展示；失败也不阻塞
+    nodeStore.fetchNodes().catch(() => null)
+  ])
 })
 
 const loadTasks = async () => {
@@ -123,6 +155,10 @@ const loadTasks = async () => {
 
 const viewTask = (taskId: string) => {
   router.push(`/tasks/${taskId}`)
+}
+
+const editTask = (taskId: string) => {
+  router.push(`/tasks/${taskId}/edit`)
 }
 
 const handleCancel = async (taskId: string) => {
@@ -194,6 +230,17 @@ const handleDelete = async (taskId: string) => {
     loadTasks()
   } catch (error) {
     ElMessage.error('删除失败')
+  }
+}
+
+const handleCopy = async (taskId: string, taskName: string) => {
+  try {
+    const newName = taskName + ' (副本)'
+    const res = await taskStore.copyTask(taskId, newName)
+    ElMessage.success('任务已复制: ' + res.taskId)
+    loadTasks()
+  } catch (error: any) {
+    ElMessage.error('复制失败: ' + (error.message || '未知错误'))
   }
 }
 </script>

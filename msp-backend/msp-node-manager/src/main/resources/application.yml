@@ -2,10 +2,19 @@ spring:
   application:
     name: msp-node-manager
   datasource:
-    url: jdbc:mysql://localhost:3306/msp_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://mysql:3306/msp_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: msp
     password: msp123456
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 server:
   port: 8082
+
+# 节点心跳健康监控：Python 端每 HEARTBEAT_INTERVAL 秒（默认 10s）上报一次心跳，
+# 超过 stale-threshold-seconds 未上报的 ONLINE 节点自动置 OFFLINE。
+# 心跳重新到达时立即置 ONLINE（NodeController.heartbeat 无条件更新）。
+msp:
+  node:
+    heartbeat:
+      stale-threshold-seconds: 30
+      check-interval-ms: 5000

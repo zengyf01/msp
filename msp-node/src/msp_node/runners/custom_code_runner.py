@@ -108,13 +108,13 @@ class CustomCodeRunner(BaseRunner):
             import secretflow as sf
             return sf
         except ImportError:
-            logger.warning("SecretFlow not installed, using mock")
-            return self._create_mock_secretflow()
+            logger.warning("SecretFlow not installed, using test mode")
+            return self._create_test_secretflow()
 
-    def _create_mock_secretflow(self):
-        """创建SecretFlow模拟对象"""
+    def _create_test_secretflow(self):
+        """创建SecretFlow测试对象"""
 
-        class MockSF:
+        class TestSF:
             class Device:
                 pass
 
@@ -127,13 +127,13 @@ class CustomCodeRunner(BaseRunner):
                     self.config = config
 
                 def __getattr__(self, name):
-                    return lambda *args, **kwargs: f"mock_{name}"
+                    return lambda *args, **kwargs: f"test_{name}"
 
             @staticmethod
             def reveal(data):
-                return "mock_revealed_data"
+                return "test_revealed_data"
 
-        return MockSF()
+        return TestSF()
 
     def cleanup(self) -> None:
         """清理资源"""

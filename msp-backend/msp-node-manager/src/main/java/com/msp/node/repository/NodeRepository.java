@@ -3,6 +3,8 @@ package com.msp.node.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.msp.common.core.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -16,6 +18,8 @@ import java.util.Set;
  */
 @Repository
 public class NodeRepository {
+
+    private static final Logger log = LoggerFactory.getLogger(NodeRepository.class);
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -39,6 +43,7 @@ public class NodeRepository {
                 tags = VALUES(tags),
                 update_time = VALUES(update_time)
             """;
+        log.info("[SQL] INSERT/UPDATE | table=msp_nodes | node_id={}", node.getNodeId());
         jdbcTemplate.update(sql,
             node.getNodeId(),
             node.getNodeName(),
@@ -74,6 +79,7 @@ public class NodeRepository {
 
     public Optional<Node> findById(String nodeId) {
         String sql = "SELECT * FROM msp_nodes WHERE node_id = ?";
+        log.info("[SQL] SELECT | table=msp_nodes | WHERE node_id={}", nodeId);
         List<Node> results = jdbcTemplate.query(sql, new NodeRowMapper(objectMapper), nodeId);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
@@ -110,11 +116,23 @@ public class NodeRepository {
 
     public void updateStatus(String nodeId, NodeStatus status) {
         String sql = "UPDATE msp_nodes SET status = ?, update_time = ? WHERE node_id = ?";
+        log.info("[SQL] UPDATE | table=msp_nodes | SET status={} | WHERE node_id={}", status, nodeId);
         jdbcTemplate.update(sql, status.name(), new java.sql.Timestamp(System.currentTimeMillis()), nodeId);
+    }
+
+    /**
+     * 查询状态为 ONLINE 但 update_time 早于 cutoff 的节点（用于心跳超时检测）
+     */
+    public List<Node> findStaleOnlineNodes(long cutoffMs) {
+        String sql = "SELECT * FROM msp_nodes WHERE status = ? AND update_time < ?";
+        log.info("[SQL] SELECT | table=msp_nodes | WHERE status=ONLINE AND update_time<{}", cutoffMs);
+        return jdbcTemplate.query(sql, new NodeRowMapper(objectMapper),
+            NodeStatus.ONLINE.name(), new java.sql.Timestamp(cutoffMs));
     }
 
     public void delete(String nodeId) {
         String sql = "DELETE FROM msp_nodes WHERE node_id = ?";
+        log.info("[SQL] DELETE | table=msp_nodes | WHERE node_id={}", nodeId);
         jdbcTemplate.update(sql, nodeId);
     }
 

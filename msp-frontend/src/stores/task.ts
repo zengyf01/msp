@@ -45,6 +45,11 @@ export const useTaskStore = defineStore('task', () => {
     return res.data.data
   }
 
+  async function updateTask(taskId: string, request: TaskRequest) {
+    const res = await taskAPI.updateTask(taskId, request)
+    return res.data.data
+  }
+
   async function executeTask(taskId: string) {
     const res = await taskAPI.executeTask(taskId)
     return res.data.data
@@ -60,8 +65,18 @@ export const useTaskStore = defineStore('task', () => {
     return res.data.data
   }
 
+  async function getTaskExecution(taskId: string) {
+    const res = await taskAPI.getTaskExecution(taskId)
+    return res.data.data
+  }
+
   async function retryTask(taskId: string) {
     const res = await taskAPI.retryTask(taskId)
+    return res.data.data
+  }
+
+  async function copyTask(taskId: string, newName?: string) {
+    const res = await taskAPI.copyTask(taskId, newName)
     return res.data.data
   }
 
@@ -83,10 +98,13 @@ export const useTaskStore = defineStore('task', () => {
     fetchTask,
     createTask,
     saveDag,
+    updateTask,
     executeTask,
     cancelTask,
     getTaskResult,
+    getTaskExecution,
     retryTask,
+    copyTask,
     deleteTask,
     clearCurrentTask
   }

@@ -108,7 +108,7 @@ public class KusciaStatusPollerService {
     }
 
     /**
-     * 在模拟模式下，从本地任务状态更新数据库
+     * 在测试模式下，从本地任务状态更新数据库
      */
     private void updateStatusFromLocalState(Task task) {
         // In simulation mode, the TaskSchedulerImpl handles all status updates
@@ -137,8 +137,29 @@ public class KusciaStatusPollerService {
             return;
         }
 
-        // 查询Kuscia状态
-        TaskStatus newStatus = kusciaClient.getTaskStatus(taskId);
+        // 关键：只对 kuscia 模式的任务才去问 kuscia。
+        // Ray 模式任务由 TaskSchedulerImpl.executeRayTask 自己管 status，
+        // 这里绝对不能调 kuscia —— kuscia 不可达时 getTaskStatus 会 fallback 返回 PENDING，
+        // 把 Ray 模式已经写好的 RUNNING / COMPLETED 状态覆盖掉。
+        String nodeMode = task.getNodeMode() == null ? "ray" : task.getNodeMode();
+        if (!"kuscia".equalsIgnoreCase(nodeMode)) {
+            log.debug("Task {} is {} mode, skip kuscia poll", taskId, nodeMode);
+            return;
+        }
+
+        // 查询Kuscia状态。kuscia 集群不可达时 getTaskStatus 不会抛异常，而是 fallback 返回 PENDING，
+        // 这里把这种情况也当成"不可达"处理 —— 不动 status。
+        TaskStatus newStatus;
+        try {
+            newStatus = kusciaClient.getTaskStatus(taskId);
+        } catch (Exception e) {
+            log.warn("Skip status poll for task {} (kuscia unavailable): {}", taskId, e.getMessage());
+            return;
+        }
+        if (newStatus == null) {
+            log.warn("Skip status poll for task {} (kuscia returned null)", taskId);
+            return;
+        }
 
         // 状态变化时更新数据库
         if (newStatus != previousStatus) {

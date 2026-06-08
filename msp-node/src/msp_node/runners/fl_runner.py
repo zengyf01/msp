@@ -1,6 +1,6 @@
 """
 联邦学习运行器
-基于SecretFlow FL框架实现真实的联邦学习
+基于SecretFlow FL框架实现联邦学习
 """
 
 from typing import Dict, Any

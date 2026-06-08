@@ -207,7 +207,7 @@
 
         <!-- 组件 DAG 模式 -->
         <el-tab-pane label="组件 DAG" name="dag" class="dag-tab-pane">
-          <DAGDesignerView />
+          <TaskDagWizard mode="create" @submitted="onDagSubmitted" />
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -221,7 +221,7 @@ import { ElMessage } from 'element-plus'
 import { useTaskStore } from '@/stores/task'
 import { useNodeStore } from '@/stores/node'
 import type { TaskRequest } from '@/types'
-import DAGDesignerView from './DAGDesignerView.vue'
+import TaskDagWizard from './components/TaskDagWizard.vue'
 import { FullScreen, Close } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -290,7 +290,7 @@ const codeForm = reactive({
 const parametersJson = ref('')
 
 const availableNodes = computed(() => {
-  // 只使用从数据库读取的真实节点
+  // 只使用从数据库读取的节点
   return nodeStore.nodes.filter(n => n.status === 'ONLINE') || []
 })
 
@@ -451,6 +451,11 @@ const submitCodeForm = async () => {
 
 const goBack = () => {
   router.back()
+}
+
+const onDagSubmitted = (_taskId: string) => {
+  // TaskDagWizard 自己负责跳到 /tasks，这里只接事件作埋点 / 日志用
+  // （避免重复 router.push）
 }
 </script>
 

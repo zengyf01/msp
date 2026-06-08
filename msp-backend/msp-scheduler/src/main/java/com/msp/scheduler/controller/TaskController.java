@@ -75,6 +75,24 @@ public class TaskController {
     }
 
     /**
+     * 更新已保存的任务（仅允许 CREATED 状态）。供前端 DAG 草稿编辑使用。
+     */
+    @PutMapping("/{taskId}")
+    public ApiResponse<Boolean> updateTask(@PathVariable(name = "taskId") String taskId,
+                                            @RequestBody TaskRequest request,
+                                            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        boolean ok = taskScheduler.updateTask(taskId, request);
+
+        // 记录审计日志
+        auditLogService.log(userId != null ? userId : "system", "UPDATE_TASK", "TASK", taskId,
+            Map.of("name", request.getName() != null ? request.getName() : "",
+                   "type", request.getType() != null ? request.getType().name() : "UNKNOWN",
+                   "participants", request.getParticipants() != null ? request.getParticipants().size() : 0), null);
+
+        return ApiResponse.success(ok);
+    }
+
+    /**
      * 执行已保存的任务
      */
     @PostMapping("/{taskId}/execute")
@@ -143,16 +161,55 @@ public class TaskController {
     @GetMapping("/{taskId}/result")
     public ApiResponse<TaskResultResponse> getTaskResult(@PathVariable(name = "taskId") String taskId) {
         Task task = taskScheduler.getTask(taskId);
-        byte[] resultData = kusciaClient.getTaskResult(taskId);
-        return ApiResponse.success(new TaskResultResponse(taskId, task.getStatus(), resultData));
+        String nodeMode = task.getNodeMode() == null ? "ray" : task.getNodeMode();
+        Object resultPayload;
+        if ("kuscia".equalsIgnoreCase(nodeMode)) {
+            // Kuscia 编排：结果在 kuscia 自己的存储里
+            resultPayload = kusciaClient.getTaskResult(taskId);
+        } else {
+            // Ray 模式：结果已经写回 task.result 字段
+            // （TaskSchedulerImpl.executeRayTask / RayTaskExecutor.updateResult）
+            // 这里即便为空也返回空字符串，不要去调 kuscia（节点是 Ray 模式，kuscia 没数据）
+            resultPayload = task.getResult() != null ? task.getResult() : "";
+        }
+        return ApiResponse.success(new TaskResultResponse(taskId, task.getStatus(), resultPayload));
     }
 
     /**
-     * 重试失败任务
+     * 获取任务执行过程日志（分发 / 节点执行轨迹）
+     */
+    @GetMapping("/{taskId}/execution")
+    public ApiResponse<TaskExecutionResponse> getTaskExecution(@PathVariable(name = "taskId") String taskId) {
+        Task task = taskScheduler.getTask(taskId);
+        String executionLog = task.getExecutionLog() != null ? task.getExecutionLog() : "[]";
+        // dag_definition 也带上，前端可以一并展示实际定义
+        String dagDefinition = null;
+        if (task.getParameters() != null) {
+            dagDefinition = task.getParameters().get("dag_definition");
+        }
+        return ApiResponse.success(new TaskExecutionResponse(
+            taskId, task.getStatus(), task.getNodeMode(), executionLog, dagDefinition));
+    }
+
+    /**
+     * 重试失败任务（在同一任务上重试，不创建新任务）
      */
     @PostMapping("/{taskId}/retry")
     public ApiResponse<TaskCreateResponse> retryTask(@PathVariable(name = "taskId") String taskId) {
-        String newTaskId = taskScheduler.retryTask(taskId);
+        String resultTaskId = taskScheduler.retryTask(taskId);
+        // retryTask 返回的是同一个 taskId，状态已经是 PENDING（重新执行中）
+        return ApiResponse.success(new TaskCreateResponse(resultTaskId, TaskStatus.PENDING));
+    }
+
+    /**
+     * 复制任务
+     */
+    @PostMapping("/{taskId}/copy")
+    public ApiResponse<TaskCreateResponse> copyTask(
+            @PathVariable(name = "taskId") String taskId,
+            @RequestBody(required = false) Map<String, String> body) {
+        String newName = body != null ? body.get("name") : null;
+        String newTaskId = taskScheduler.copyTask(taskId, newName);
         return ApiResponse.success(new TaskCreateResponse(newTaskId, TaskStatus.CREATED));
     }
 
@@ -200,5 +257,31 @@ public class TaskController {
         public String getTaskId() { return taskId; }
         public TaskStatus getStatus() { return status; }
         public Object getResult() { return result; }
+    }
+
+    /**
+     * 任务执行过程响应：包含实际执行日志和实际 DAG 定义
+     */
+    public static class TaskExecutionResponse {
+        private String taskId;
+        private TaskStatus status;
+        private String nodeMode;
+        private String executionLog;   // JSON 数组字符串
+        private String dagDefinition;  // JSON 字符串，可能是 null
+
+        public TaskExecutionResponse(String taskId, TaskStatus status, String nodeMode,
+                                      String executionLog, String dagDefinition) {
+            this.taskId = taskId;
+            this.status = status;
+            this.nodeMode = nodeMode;
+            this.executionLog = executionLog;
+            this.dagDefinition = dagDefinition;
+        }
+
+        public String getTaskId() { return taskId; }
+        public TaskStatus getStatus() { return status; }
+        public String getNodeMode() { return nodeMode; }
+        public String getExecutionLog() { return executionLog; }
+        public String getDagDefinition() { return dagDefinition; }
     }
 }

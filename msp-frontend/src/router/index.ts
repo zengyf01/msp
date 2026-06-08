@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type NavigationGuardNext, type RouteLoc
 import TaskList from '@/views/TaskList.vue'
 import CreateTaskView from '@/views/CreateTaskView.vue'
 import TaskDetailView from '@/views/TaskDetailView.vue'
+import TaskEditView from '@/views/TaskEditView.vue'
 import NodeList from '@/views/NodeList.vue'
 import DataSourceListView from '@/views/DataSourceListView.vue'
 import DataSourceEditView from '@/views/DataSourceEditView.vue'
@@ -64,6 +65,12 @@ const routes = [
     path: '/tasks/:taskId',
     name: 'TaskDetail',
     component: TaskDetailView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/tasks/:taskId/edit',
+    name: 'TaskEdit',
+    component: TaskEditView,
     meta: { requiresAuth: true }
   },
   {

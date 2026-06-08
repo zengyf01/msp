@@ -18,8 +18,7 @@
       <el-table-column prop="name" label="名称" min-width="150" show-overflow-tooltip />
       <el-table-column prop="type" label="类型" width="120">
         <template #default="{ row }">
-          <el-tag v-if="row.isSimulated" type="warning">模拟</el-tag>
-          <el-tag v-else>{{ row.type }}</el-tag>
+          <el-tag>{{ row.type }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="nodeId" label="所属节点" width="150" />
@@ -28,21 +27,18 @@
       <el-table-column label="操作" width="200">
         <template #default="{ row }">
           <el-button size="small" @click="viewDataSource(row.dataSourceId)">查看</el-button>
-          <el-tooltip v-if="row.isSimulated" content="模拟数据源不支持删除" placement="left">
-            <el-button size="small" type="info" disabled>删除</el-button>
-          </el-tooltip>
-          <el-button v-else size="small" type="danger" @click="handleDelete(row.dataSourceId)">删除</el-button>
+          <el-button size="small" type="danger" @click="handleDelete(row.dataSourceId)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 模拟数据源详情对话框 -->
+    <!-- 数据源详情对话框 -->
     <el-dialog v-model="detailDialogVisible" title="数据源详情" width="600px">
       <el-descriptions :column="2" border v-if="selectedDataSource">
         <el-descriptions-item label="数据源ID">{{ selectedDataSource.dataSourceId }}</el-descriptions-item>
         <el-descriptions-item label="名称">{{ selectedDataSource.name }}</el-descriptions-item>
         <el-descriptions-item label="类型">
-          <el-tag type="warning">模拟数据源</el-tag>
+          <el-tag type="warning">数据源</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="所属节点">{{ selectedDataSource.nodeId }}</el-descriptions-item>
         <el-descriptions-item label="主机">{{ selectedDataSource.host }}</el-descriptions-item>
@@ -90,7 +86,7 @@ const detailDialogVisible = ref(false)
 const selectedDataSource = ref<any>(null)
 
 const dataSources = computed(() => {
-  // 只使用从数据库读取的真实数据源
+  // 只使用从数据库读取的数据源
   return dataSourceStore.dataSources || []
 })
 const loading = computed(() => dataSourceStore.loading)

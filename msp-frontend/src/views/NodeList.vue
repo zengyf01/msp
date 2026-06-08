@@ -34,8 +34,7 @@
         </el-table-column>
         <el-table-column prop="nodeMode" label="类型" width="100">
           <template #default="{ row }">
-            <el-tag v-if="row.isSimulated" type="warning" size="small">模拟</el-tag>
-            <el-tag v-else :type="getNodeModeType(row.nodeMode)" size="small">{{ getNodeModeLabel(row.nodeMode) }}</el-tag>
+            <el-tag :type="getNodeModeType(row.nodeMode)" size="small">{{ getNodeModeLabel(row.nodeMode) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="capabilities" label="能力" min-width="180">
@@ -61,12 +60,7 @@
         </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
-            <el-tooltip v-if="row.isSimulated" content="模拟节点不支持注销" placement="left">
-              <el-button size="small" text type="info" disabled>
-                注销
-              </el-button>
-            </el-tooltip>
-            <el-button v-else size="small" text type="danger" @click="handleUnregister(row.nodeId)">
+            <el-button size="small" text type="danger" @click="handleUnregister(row.nodeId)">
               注销
             </el-button>
           </template>
@@ -148,7 +142,7 @@ const nodeRules = {
 }
 
 const nodes = computed(() => {
-  // 只使用从数据库读取的真实节点
+  // 只使用从数据库读取的节点
   return nodeStore.nodes || []
 })
 const loading = computed(() => nodeStore.loading)

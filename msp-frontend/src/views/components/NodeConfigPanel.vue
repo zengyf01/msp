@@ -25,7 +25,7 @@
         <!-- 读取数据表配置 -->
         <template v-if="node.compId === 'read_table'">
           <el-form-item label="数据源">
-            <el-select v-model="config.datasource_id" placeholder="选择数据源" style="width: 100%" clearable :loading="dataSourceStore.loading">
+            <el-select v-model="config.datasource_id" placeholder="选择数据源" style="width: 100%" clearable :loading="dataSourceStore.loading" @change="onDatasourceChange">
               <el-option
                 v-for="ds in dataSources"
                 :key="ds.dataSourceId"
@@ -35,12 +35,12 @@
             </el-select>
           </el-form-item>
           <el-form-item label="数据表">
-            <el-select v-model="config.table_name" placeholder="选择数据表" style="width: 100%" :disabled="!config.datasource_id" clearable :loading="loadingTables">
+            <el-select v-model="config.table_name" placeholder="选择数据表" style="width: 100%" :disabled="!config.datasource_id" clearable :loading="loadingTables" @change="onTableChange">
               <el-option
                 v-for="table in availableTables"
-                :key="table"
-                :label="table"
-                :value="table"
+                :key="table.name"
+                :label="formatDbLabel(table)"
+                :value="table.name"
               />
             </el-select>
           </el-form-item>
@@ -48,9 +48,9 @@
             <el-select v-model="config.columns" multiple placeholder="选择要读取的列(留空读取全部)" style="width: 100%" :disabled="!config.table_name" clearable :loading="loadingColumns">
               <el-option
                 v-for="col in availableColumns"
-                :key="col"
-                :label="col"
-                :value="col"
+                :key="col.name"
+                :label="formatDbLabel(col)"
+                :value="col.name"
               />
             </el-select>
           </el-form-item>
@@ -59,9 +59,9 @@
             <el-select v-model="config.filter_column" placeholder="选择过滤条件列" style="width: 100%" :disabled="!config.table_name" clearable>
               <el-option
                 v-for="col in availableColumns"
-                :key="col"
-                :label="col"
-                :value="col"
+                :key="col.name"
+                :label="formatDbLabel(col)"
+                :value="col.name"
               />
             </el-select>
           </el-form-item>
@@ -237,9 +237,9 @@
             <el-select v-model="config.keep_columns" multiple placeholder="选择要保留的列" style="width: 100%">
               <el-option
                 v-for="col in availableColumns"
-                :key="col"
-                :label="col"
-                :value="col"
+                :key="col.name"
+                :label="formatDbLabel(col)"
+                :value="col.name"
               />
             </el-select>
           </el-form-item>
@@ -247,9 +247,9 @@
             <el-select v-model="config.drop_columns" multiple placeholder="选择要排除的列" style="width: 100%">
               <el-option
                 v-for="col in availableColumns"
-                :key="col"
-                :label="col"
-                :value="col"
+                :key="col.name"
+                :label="formatDbLabel(col)"
+                :value="col.name"
               />
             </el-select>
           </el-form-item>
@@ -261,9 +261,9 @@
             <el-select v-model="config.filter_column" placeholder="选择过滤条件列" style="width: 100%">
               <el-option
                 v-for="col in availableColumns"
-                :key="col"
-                :label="col"
-                :value="col"
+                :key="col.name"
+                :label="formatDbLabel(col)"
+                :value="col.name"
               />
             </el-select>
           </el-form-item>
@@ -298,9 +298,9 @@
             <el-select v-model="config.null_columns" multiple placeholder="选择要处理的列(留空处理全部)" style="width: 100%">
               <el-option
                 v-for="col in availableColumns"
-                :key="col"
-                :label="col"
-                :value="col"
+                :key="col.name"
+                :label="formatDbLabel(col)"
+                :value="col.name"
               />
             </el-select>
           </el-form-item>
@@ -315,9 +315,9 @@
             <el-select v-model="config.duplicate_columns" multiple placeholder="选择去重依据列(留空使用全部列)" style="width: 100%">
               <el-option
                 v-for="col in availableColumns"
-                :key="col"
-                :label="col"
-                :value="col"
+                :key="col.name"
+                :label="formatDbLabel(col)"
+                :value="col.name"
               />
             </el-select>
           </el-form-item>
@@ -335,9 +335,9 @@
             <el-select v-model="config.range_column" placeholder="选择范围过滤列" style="width: 100%">
               <el-option
                 v-for="col in availableColumns"
-                :key="col"
-                :label="col"
-                :value="col"
+                :key="col.name"
+                :label="formatDbLabel(col)"
+                :value="col.name"
               />
             </el-select>
           </el-form-item>
@@ -372,18 +372,21 @@
     </div>
 
     <div class="panel-footer">
-      <el-button type="primary" @click="onApply">应用配置</el-button>
+      <span v-if="appliedFlash" class="applied-pill">已应用</span>
+      <span v-else class="auto-save-hint">改动会在停止输入 0.15s 后自动保存</span>
+      <el-button type="primary" @click="onApply">立即应用</el-button>
       <el-button @click="onReset">重置</el-button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, computed, onMounted } from 'vue'
+import { ref, reactive, watch, computed, onMounted, nextTick } from 'vue'
 import { Close } from '@element-plus/icons-vue'
 import { useDataSourceStore } from '@/stores/dataSource'
 import { useNodeStore } from '@/stores/node'
 import { dataSourceAPI } from '@/api/index'
+import type { TableInfo, ColumnInfo } from '@/types'
 
 interface NodeConfig {
   datasource_id?: string
@@ -438,14 +441,44 @@ const configText = ref('')
 const loadingTables = ref(false)
 const loadingColumns = ref(false)
 
-// 获取可用的数据源列表（从数据库实时读取，包含模拟和真实数据源）
+// 离焦/改值时自动把 config 同步给父组件（DAGDesignerView）。
+// 直接同步 emit，不在面板层做 debounce —— wizard 那层 2s debounce 会做批处理。
+// 这里加 debounce 反而会让 select 选完后到 PUT 之间多一拍状态窗口，
+// 期间父级任何 attrs 回写都可能覆盖用户的进行中选项。
+// suppressEmit 用来在"父组件切换节点 → 重新灌入 attrs"那一帧内吞掉 emit，避免反馈环。
+const suppressEmit = ref(false)
+// "已应用"反馈条：每次成功 emit 1.2s 内显示
+const appliedFlash = ref(false)
+let appliedTimer: number | null = null
+const flashApplied = () => {
+  appliedFlash.value = true
+  if (appliedTimer) clearTimeout(appliedTimer)
+  appliedTimer = window.setTimeout(() => {
+    appliedFlash.value = false
+    appliedTimer = null
+  }, 1200)
+}
+const emitUpdateNow = () => {
+  if (suppressEmit.value) return
+  // eslint-disable-next-line no-console
+  console.log('[NodeConfigPanel] emit update', { ...config })
+  emit('update', { ...config })
+  flashApplied()
+}
+watch(config, emitUpdateNow, { deep: true, flush: 'post' })
+
+// 获取可用的数据源列表（从数据库实时读取）
 const dataSources = computed(() => {
   return dataSourceStore.dataSources || []
 })
 
 // 根据已选数据源动态加载表名
-const availableTables = ref<string[]>([])
-const availableColumns = ref<string[]>([])
+const availableTables = ref<TableInfo[]>([])
+const availableColumns = ref<ColumnInfo[]>([])
+
+// 展示格式：英文（中文注释），无注释时只显示英文
+const formatDbLabel = (item: { name: string; comment: string }) =>
+  item.comment ? `${item.name}（${item.comment}）` : item.name
 
 // 加载数据源列表
 onMounted(async () => {
@@ -453,21 +486,29 @@ onMounted(async () => {
 })
 
 // 监听数据源变化，加载表名
+// dsLoadToken / tableLoadToken：用户连续快速切换数据源/表时，旧的 async 回调会晚到，
+// 用 token 比对丢弃过期结果，避免把"新数据源下的旧表名/旧列名"覆盖回 config
+//
+// 注意：watcher 自身不再 reset table_name / columns —— reset 由 onDatasourceChange / onTableChange
+// 显式触发，避免"面板 mount 时 config.datasource_id 被灌入已保存值 → watcher 跑 → 末尾又清空 table/columns"
+// 这种回写吃掉之前保存的状态。
+let dsLoadToken: symbol | null = null
 watch(() => config.datasource_id, async (newDsId) => {
   if (newDsId) {
-    // 调用API获取表名
     loadingTables.value = true
+    const token = (dsLoadToken = Symbol())
     try {
       const res = await dataSourceAPI.getDataSourceTables(newDsId)
+      if (token !== dsLoadToken) return
       availableTables.value = res.data.data || []
     } catch (e) {
+      if (token !== dsLoadToken) return
       console.error('Failed to load tables:', e)
       availableTables.value = []
     } finally {
-      loadingTables.value = false
+      if (token === dsLoadToken) loadingTables.value = false
     }
-    config.table_name = ''
-    config.columns = []
+    if (token !== dsLoadToken) return
     availableColumns.value = []
   } else {
     availableTables.value = []
@@ -476,34 +517,59 @@ watch(() => config.datasource_id, async (newDsId) => {
 })
 
 // 监听表名变化，加载列名
+let tableLoadToken = 0
 watch(() => config.table_name, async (newTable) => {
   if (newTable && config.datasource_id) {
     loadingColumns.value = true
+    const token = (tableLoadToken = Symbol())
     try {
       const res = await dataSourceAPI.getDataSourceColumns(config.datasource_id, newTable)
+      if (token !== tableLoadToken) return
       availableColumns.value = res.data.data || []
     } catch (e) {
+      if (token !== tableLoadToken) return
       console.error('Failed to load columns:', e)
       availableColumns.value = []
     } finally {
-      loadingColumns.value = false
+      if (token === tableLoadToken) loadingColumns.value = false
     }
-    config.columns = []
   } else {
     availableColumns.value = []
   }
 })
 
+// 用户主动改下拉时，联动清掉 table_name / columns（mount / attrs 灌入时不走这里）
+const onDatasourceChange = () => {
+  config.table_name = ''
+  config.columns = []
+}
+const onTableChange = () => {
+  config.columns = []
+}
+
 watch(
-  () => props.node.attrs,
-  (newAttrs) => {
-    Object.assign(config, newAttrs || {})
+  () => props.node?.nodeId,
+  (newNodeId, oldNodeId) => {
+    // 只在切换到不同节点时才把 config 整个重置。
+    // 之前用 `() => props.node?.attrs` + deep: true，会被自己 emit → 父组件回写 attrs 这条反馈链
+    // 反复触发，把用户正在编辑的字段（含 columns / table_name）清空覆盖，
+    // 表现就是"选了数据表/列没保存"。改成监听 nodeId 后，仅节点切换才重置。
+    if (newNodeId === oldNodeId) return
+    suppressEmit.value = true
+    Object.keys(config).forEach(k => delete (config as any)[k])
+    // 兼容两种字段名：attrs（编辑时写入）和 config（后端返回）
+    const nodeConfig = props.node?.attrs || props.node?.config || {}
+    Object.assign(config, nodeConfig)
+    nextTick(() => {
+      suppressEmit.value = false
+    })
   },
-  { immediate: true, deep: true }
+  { immediate: true }
 )
 
 const onApply = () => {
-  emit('update', { ...config })
+  // 应用配置 = 立即 flush，跳过 debounce
+  emitUpdateNow()
 }
 
 const onReset = () => {
@@ -551,6 +617,20 @@ const onClose = () => {
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid #e4e7ed;
+  align-items: center;
+}
+
+.auto-save-hint {
+  flex: 1;
+  font-size: 12px;
+  color: #909399;
+}
+
+.applied-pill {
+  flex: 1;
+  font-size: 12px;
+  color: #67c23a;
+  font-weight: 500;
 }
 
 :deep(.el-form-item) {

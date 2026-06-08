@@ -1,7 +1,9 @@
 package com.msp.scheduler.service;
 
+import com.msp.common.core.ColumnInfo;
 import com.msp.common.core.DataSource;
 import com.msp.common.core.Page;
+import com.msp.common.core.TableInfo;
 
 import java.util.List;
 
@@ -61,43 +63,25 @@ public interface DataSourceService {
     boolean testConnection(DataSource dataSource);
 
     /**
-     * 创建模拟节点（演示用）
-     * 在数据库中创建节点数据库、示例数据表
-     * @param nodeId 节点ID
-     * @param dbName 数据库名
-     * @param tableName 表名
-     * @param columnName 匹配用列名
-     * @return 创建成功返回true
-     */
-    boolean createSimulatedNode(String nodeId, String dbName, String tableName, String columnName);
-
-    /**
-     * 删除模拟节点（演示用）
-     * @param nodeId 节点ID
-     * @return 删除成功返回true
-     */
-    boolean deleteSimulatedNode(String nodeId);
-
-    /**
-     * 获取模拟节点示例数据
+     * 获取示例数据
      * @param dbName 数据库名
      * @param tableName 表名
      * @return 示例数据列表（每行是一个列表）
      */
-    List<List<Object>> getSimulatedNodeSampleData(String dbName, String tableName);
+    List<List<Object>> getSampleData(String dbName, String tableName);
 
     /**
-     * 获取数据源的所有表名
+     * 获取数据源的所有表（含表名 + 表注释，从 INFORMATION_SCHEMA 实时读取）
      * @param datasourceId 数据源ID
-     * @return 表名列表
+     * @return 表信息列表
      */
-    List<String> getDataSourceTables(String datasourceId);
+    List<TableInfo> getDataSourceTables(String datasourceId);
 
     /**
-     * 获取数据源的表字段信息
+     * 获取数据源的表字段信息（含字段名 + 字段注释，从 INFORMATION_SCHEMA 实时读取）
      * @param datasourceId 数据源ID
      * @param tableName 表名
-     * @return 字段名列表
+     * @return 字段信息列表
      */
-    List<String> getDataSourceColumns(String datasourceId, String tableName);
+    List<ColumnInfo> getDataSourceColumns(String datasourceId, String tableName);
 }

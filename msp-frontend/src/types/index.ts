@@ -51,6 +51,8 @@ export interface DataSource {
   host?: string;
   port?: number;
   database?: string;
+  username?: string;
+  password?: string;
   tableName?: string;
   columns?: string[];
 }
@@ -63,6 +65,8 @@ export interface DataSourceRequest {
   host?: string;
   port?: number;
   database?: string;
+  username?: string;
+  password?: string;
   tableName?: string;
   columns?: string[];
 }
@@ -70,6 +74,18 @@ export interface DataSourceRequest {
 // 数据源创建响应
 export interface DataSourceCreateResponse {
   datasourceId: string;
+}
+
+// 数据库表信息（name + 来自 INFORMATION_SCHEMA.TABLES.TABLE_COMMENT 的中文注释）
+export interface TableInfo {
+  name: string;
+  comment: string;
+}
+
+// 数据库字段信息（name + 来自 INFORMATION_SCHEMA.COLUMNS.COLUMN_COMMENT 的中文注释）
+export interface ColumnInfo {
+  name: string;
+  comment: string;
 }
 
 // 连接测试响应
@@ -184,6 +200,17 @@ export interface TaskResultResponse {
   taskId: string;
   status: TaskStatus;
   result?: any;
+}
+
+// 任务执行过程响应（含实际执行日志和 DAG 定义）
+export interface TaskExecutionResponse {
+  taskId: string;
+  status: TaskStatus;
+  nodeMode?: string;
+  // 数组字符串，结构：[{ts, stage, level, message, nodeId?, role?, dagNodeId?, compId?, label?, durationMs?}, ...]
+  executionLog: string;
+  // DAG 定义的 JSON 字符串
+  dagDefinition?: string;
 }
 
 // 节点注册响应
