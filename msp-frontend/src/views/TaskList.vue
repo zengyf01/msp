@@ -5,10 +5,16 @@
         <h1>任务管理</h1>
         <p class="subtitle">查看和管理所有隐私计算任务</p>
       </div>
-      <el-button type="primary" @click="router.push('/tasks/create')">
-        <el-icon><Plus /></el-icon>
-        创建任务
-      </el-button>
+      <div class="actions">
+        <el-button type="primary" @click="router.push('/tasks/create')">
+          <el-icon><Plus /></el-icon>
+          创建任务
+        </el-button>
+        <el-button @click="loadTasks">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+      </div>
     </div>
 
     <el-card class="table-card">
@@ -115,7 +121,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useTaskStore } from '@/stores/task'
 import { useNodeStore } from '@/stores/node'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Refresh } from '@element-plus/icons-vue'
 import type { TaskStatus } from '@/types'
 
 const router = useRouter()
@@ -274,6 +280,11 @@ const handleCopy = async (taskId: string, taskName: string) => {
   margin: 4px 0 0 0;
   font-size: 13px;
   color: #64748b;
+}
+
+.page-header .actions {
+  display: flex;
+  gap: 10px;
 }
 
 .table-card {

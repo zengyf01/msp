@@ -1,10 +1,37 @@
 <template>
   <div class="dag-designer">
+    <!-- 顶部类型选择栏 -->
+    <div class="type-selector-bar">
+      <el-radio-group v-model="selectedTaskType" size="default">
+        <el-radio-button label="">全部组件</el-radio-button>
+        <el-radio-button label="psi">隐私求交 (PSI)</el-radio-button>
+        <el-radio-button label="federated">联邦建模</el-radio-button>
+        <el-radio-button label="preprocessing">数据预处理</el-radio-button>
+      </el-radio-group>
+      <div class="template-section">
+        <el-dropdown trigger="click" @command="onTemplateSelect">
+          <el-button type="primary" plain :disabled="!selectedTaskType">
+            使用模板 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="psi_2party" v-if="selectedTaskType === 'psi'">PSI 两方求交</el-dropdown-item>
+              <el-dropdown-item command="psi_3party" v-if="selectedTaskType === 'psi'">PSI 三方求交</el-dropdown-item>
+              <el-dropdown-item command="fl_train_predict" v-if="selectedTaskType === 'federated'">联邦学习训练+预测</el-dropdown-item>
+              <el-dropdown-item command="fl_train_only" v-if="selectedTaskType === 'federated'">仅联邦学习训练</el-dropdown-item>
+              <el-dropdown-item command="preprocess_basic" v-if="selectedTaskType === 'preprocessing'">基础数据清洗</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span class="template-tip" v-if="!selectedTaskType">请先选择任务类型</span>
+      </div>
+    </div>
+
     <el-container>
       <!-- 左侧组件面板 -->
       <el-aside width="280px" class="component-aside">
         <ComponentPanel
-          :components="componentList"
+          :components="filteredComponentList"
           @drag-start="onComponentDragStart"
           @component-click="onComponentClick"
         />
@@ -94,6 +121,7 @@ import ComponentPanel from './components/ComponentPanel.vue'
 import DAGCanvas from './components/DAGCanvas.vue'
 import NodeConfigPanel from './components/NodeConfigPanel.vue'
 import { useTaskStore } from '@/stores/task'
+import { ArrowDown } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   // 是否显示内置的"保存 DAG"按钮和保存对话框。默认 false ——
@@ -182,6 +210,108 @@ const componentList = [
     ]
   }
 ]
+
+// 任务类型过滤器配置
+const taskTypeFilter: Record<string, string[]> = {
+  psi: ['data', 'alignment', 'output'],
+  federated: ['data', 'filter', 'preprocessing', 'linear', 'tree', 'evaluation', 'output'],
+  preprocessing: ['data', 'filter', 'preprocessing', 'output']
+}
+
+// 根据选中的任务类型过滤组件
+const selectedTaskType = ref('')
+const filteredComponentList = computed(() => {
+  if (!selectedTaskType.value) return componentList
+  const allowedCategories = taskTypeFilter[selectedTaskType.value] || []
+  return componentList.filter(cat => allowedCategories.includes(cat.category))
+})
+
+// 任务模板
+const taskTemplates: Record<string, { nodes: any[]; edges: any[] }> = {
+  psi_2party: {
+    nodes: [
+      { nodeId: 'node_1', compId: 'read_table', label: '读取数据表A', x: 50, y: 100, attrs: {}, inputs: [], outputs: [{ name: 'data', type: 'output' }] },
+      { nodeId: 'node_2', compId: 'read_table', label: '读取数据表B', x: 50, y: 280, attrs: {}, inputs: [], outputs: [{ name: 'data', type: 'output' }] },
+      { nodeId: 'node_3', compId: 'psi', label: 'PSI求交', x: 300, y: 180, attrs: {}, inputs: [{ name: 'data_a', type: 'input' }, { name: 'data_b', type: 'input' }], outputs: [{ name: 'aligned_data', type: 'output' }] },
+      { nodeId: 'node_4', compId: 'write_table', label: '写入结果', x: 550, y: 180, attrs: {}, inputs: [{ name: 'data', type: 'input' }], outputs: [] }
+    ],
+    edges: [
+      { from: 'node_1', to: 'node_3', fromPort: 'data', toPort: 'data_a' },
+      { from: 'node_2', to: 'node_3', fromPort: 'data', toPort: 'data_b' },
+      { from: 'node_3', to: 'node_4', fromPort: 'aligned_data', toPort: 'data' }
+    ]
+  },
+  psi_3party: {
+    nodes: [
+      { nodeId: 'node_1', compId: 'read_table', label: '读取数据表A', x: 50, y: 80, attrs: {}, inputs: [], outputs: [{ name: 'data', type: 'output' }] },
+      { nodeId: 'node_2', compId: 'read_table', label: '读取数据表B', x: 50, y: 200, attrs: {}, inputs: [], outputs: [{ name: 'data', type: 'output' }] },
+      { nodeId: 'node_3', compId: 'read_table', label: '读取数据表C', x: 50, y: 320, attrs: {}, inputs: [], outputs: [{ name: 'data', type: 'output' }] },
+      { nodeId: 'node_4', compId: 'psi_tp', label: '三方PSI', x: 300, y: 180, attrs: {}, inputs: [{ name: 'data_a', type: 'input' }, { name: 'data_b', type: 'input' }, { name: 'data_c', type: 'input' }], outputs: [{ name: 'aligned_data', type: 'output' }] },
+      { nodeId: 'node_5', compId: 'write_table', label: '写入结果', x: 550, y: 180, attrs: {}, inputs: [{ name: 'data', type: 'input' }], outputs: [] }
+    ],
+    edges: [
+      { from: 'node_1', to: 'node_4', fromPort: 'data', toPort: 'data_a' },
+      { from: 'node_2', to: 'node_4', fromPort: 'data', toPort: 'data_b' },
+      { from: 'node_3', to: 'node_4', fromPort: 'data', toPort: 'data_c' },
+      { from: 'node_4', to: 'node_5', fromPort: 'aligned_data', toPort: 'data' }
+    ]
+  },
+  fl_train_predict: {
+    nodes: [
+      { nodeId: 'node_1', compId: 'read_table', label: '读取训练数据', x: 50, y: 100, attrs: {}, inputs: [], outputs: [{ name: 'data', type: 'output' }] },
+      { nodeId: 'node_2', compId: 'sample', label: '数据采样', x: 250, y: 100, attrs: {}, inputs: [{ name: 'data', type: 'input' }], outputs: [{ name: 'sampled_data', type: 'output' }] },
+      { nodeId: 'node_3', compId: 'sgb_train', label: 'SGB训练', x: 450, y: 100, attrs: {}, inputs: [{ name: 'train_data', type: 'input' }], outputs: [{ name: 'model', type: 'model' }] },
+      { nodeId: 'node_4', compId: 'read_table', label: '读取预测数据', x: 50, y: 280, attrs: {}, inputs: [], outputs: [{ name: 'data', type: 'output' }] },
+      { nodeId: 'node_5', compId: 'sgb_predict', label: 'SGB预测', x: 450, y: 280, attrs: {}, inputs: [{ name: 'model', type: 'model' }, { name: 'predict_data', type: 'input' }], outputs: [{ name: 'predictions', type: 'output' }] },
+      { nodeId: 'node_6', compId: 'biclassification_eval', label: '模型评估', x: 650, y: 190, attrs: {}, inputs: [{ name: 'data', type: 'input' }], outputs: [{ name: 'metrics', type: 'metrics' }] },
+      { nodeId: 'node_7', compId: 'write_table', label: '写入结果', x: 850, y: 280, attrs: {}, inputs: [{ name: 'data', type: 'input' }], outputs: [] }
+    ],
+    edges: [
+      { from: 'node_1', to: 'node_2', fromPort: 'data', toPort: 'data' },
+      { from: 'node_2', to: 'node_3', fromPort: 'sampled_data', toPort: 'train_data' },
+      { from: 'node_4', to: 'node_5', fromPort: 'data', toPort: 'predict_data' },
+      { from: 'node_3', to: 'node_5', fromPort: 'model', toPort: 'model' },
+      { from: 'node_5', to: 'node_6', fromPort: 'predictions', toPort: 'data' },
+      { from: 'node_5', to: 'node_7', fromPort: 'predictions', toPort: 'data' }
+    ]
+  },
+  fl_train_only: {
+    nodes: [
+      { nodeId: 'node_1', compId: 'read_table', label: '读取数据', x: 50, y: 100, attrs: {}, inputs: [], outputs: [{ name: 'data', type: 'output' }] },
+      { nodeId: 'node_2', compId: 'binning', label: '分箱处理', x: 250, y: 100, attrs: {}, inputs: [{ name: 'data', type: 'input' }], outputs: [{ name: 'binned_data', type: 'output' }] },
+      { nodeId: 'node_3', compId: 'ss_glm_train', label: 'GLM训练', x: 450, y: 100, attrs: {}, inputs: [{ name: 'train_data', type: 'input' }], outputs: [{ name: 'model', type: 'model' }] },
+      { nodeId: 'node_4', compId: 'write_table', label: '保存模型', x: 650, y: 100, attrs: {}, inputs: [{ name: 'data', type: 'input' }], outputs: [] }
+    ],
+    edges: [
+      { from: 'node_1', to: 'node_2', fromPort: 'data', toPort: 'data' },
+      { from: 'node_2', to: 'node_3', fromPort: 'binned_data', toPort: 'train_data' },
+      { from: 'node_3', to: 'node_4', fromPort: 'model', toPort: 'data' }
+    ]
+  },
+  preprocess_basic: {
+    nodes: [
+      { nodeId: 'node_1', compId: 'read_table', label: '读取数据', x: 50, y: 100, attrs: {}, inputs: [], outputs: [{ name: 'data', type: 'output' }] },
+      { nodeId: 'node_2', compId: 'filter_null', label: '空值处理', x: 250, y: 100, attrs: {}, inputs: [{ name: 'data', type: 'input' }], outputs: [{ name: 'filtered_data', type: 'output' }] },
+      { nodeId: 'node_3', compId: 'filter_duplicate', label: '去重处理', x: 450, y: 100, attrs: {}, inputs: [{ name: 'data', type: 'input' }], outputs: [{ name: 'filtered_data', type: 'output' }] },
+      { nodeId: 'node_4', compId: 'write_table', label: '保存结果', x: 650, y: 100, attrs: {}, inputs: [{ name: 'data', type: 'input' }], outputs: [] }
+    ],
+    edges: [
+      { from: 'node_1', to: 'node_2', fromPort: 'data', toPort: 'data' },
+      { from: 'node_2', to: 'node_3', fromPort: 'filtered_data', toPort: 'data' },
+      { from: 'node_3', to: 'node_4', fromPort: 'filtered_data', toPort: 'data' }
+    ]
+  }
+}
+
+// 选择模板
+const onTemplateSelect = (templateKey: string) => {
+  const template = taskTemplates[templateKey]
+  if (template) {
+    localNodes.value = JSON.parse(JSON.stringify(template.nodes))
+    localEdges.value = JSON.parse(JSON.stringify(template.edges))
+    ElMessage.success('已加载模板：' + (templateKey === 'psi_2party' ? 'PSI 两方求交' : templateKey === 'psi_3party' ? 'PSI 三方求交' : templateKey === 'fl_train_predict' ? '联邦学习训练+预测' : '联邦学习训练'))
+  }
+}
 
 // DAG 数据
 // 内部用本地 ref，画布改动通过 watcher 同步给父组件（v-model）
@@ -625,6 +755,31 @@ const onExecute = async () => {
   height: calc(100vh - 140px);
   display: flex;
   flex-direction: column;
+}
+
+.type-selector-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid #e4e7ed;
+  gap: 16px;
+}
+
+.type-selector-bar :deep(.el-radio-group) {
+  flex-wrap: nowrap;
+}
+
+.template-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-tip {
+  font-size: 12px;
+  color: #909399;
 }
 
 .component-aside {
